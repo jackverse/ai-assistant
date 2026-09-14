@@ -114,7 +114,11 @@ func (a *App) GetDeploy() DeployDTO {
 }
 
 // SaveDeploy 保存部署配置并持久化。
+//
+// 保存前先规整：把历史遗留的、写错的模块 Root 改写成正确值再落盘，
+// 避免错误路径在配置里一直传下去。
 func (a *App) SaveDeploy(cfg deploy.Config) error {
+	deploy.NormalizeConfig(&cfg, cfg.BasePath)
 	a.cfg.Deploy = cfg
 	return a.cfg.Save()
 }

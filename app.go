@@ -13,6 +13,7 @@ import (
 	"winclean/internal/ai"
 	"winclean/internal/cli"
 	"winclean/internal/config"
+	"winclean/internal/deploy"
 	"winclean/internal/model"
 	"winclean/internal/modules"
 	"winclean/internal/report"
@@ -155,6 +156,20 @@ func registerModules() {
 // startup 由 Wails 在窗口就绪后调用。
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// 配置自愈：把历史遗留的、写错的模块 Root 改写为正确值并落盘。
+	// 放在启动时做的原因——这样用户一打开界面看到的路径就是对的，
+	// 而不是每次靠运行期容错兜着、配置里却一直是错值。
+	// 开销极小：只对已配置的模块做几次目录存在性检查。
+	if deploy.NormalizeConfig(&a.cfg.Deploy, a.cfg.Deploy.BasePath) {
+		if err := a.cfg.Save(); err != nil {
+			a.bootWarnings = append(a.bootWarnings,
+				"部署配置已自动修正，但写回配置文件失败："+err.Error())
+		} else {
+			a.bootWarnings = append(a.bootWarnings,
+				"已自动修正部署配置里写错的模块路径（原路径会拼出重复的项目目录）")
+		}
+	}
 }
 
 // SetBootWarnings 记录启动阶段的非致命问题（如配置损坏已回退默认）。

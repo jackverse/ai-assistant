@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -330,6 +331,42 @@ func mvnArgs(mvn string, skipTests bool) []string {
 	return args
 }
 
+// CREATE_NO_WINDOW：为子进程创建但不显示控制台窗口。
+//
+// 本程序是 GUI 子系统（编译时 -H windowsgui），自身没有控制台。
+// 这种进程启动控制台子进程时，Windows 默认会【新建一个控制台窗口】——
+// 实测表现就是打包时满屏弹 cmd 黑窗（mvn、npm 各弹一个，还层层叠叠）。
+// 必须显式禁止：CreationFlags 用 CREATE_NO_WINDOW，并配合 HideWindow。
+// 加上它之后子进程的 stdout/stderr 管道照常工作，日志仍能实时读到。
+const createNoWindow = 0x08000000
+
+// ansiRE 匹配终端颜色/控制序列。
+//
+// 为什么要剥掉：mvn 与 vite 在检测到管道输出时仍会写 ANSI 颜色码
+// （实测 vite 输出里满是 [2m[22m[36m 这类序列）。界面的日志窗格是纯文本
+// 容器，不解析 ANSI，这些序列会显示成乱码般的噪声，把真正的内容淹没。
+var ansiRE = regexp.MustCompile(
+	`\x1b\[[0-9;?]*[ -/]*[@-~]` + // CSI 序列：颜色、光标移动、清屏
+		`|\x1b\][^\x1b\x07]*(?:\x07|\x1b\\)` + // OSC 序列：设置标题等
+		`|\x1b[@-Z\\-_]`) // 其它单字符转义
+
+// stripANSI 去掉终端控制序列。
+func stripANSI(s string) string {
+	if !strings.ContainsRune(s, 0x1b) {
+		return s // 绝大多数行没有转义符，省掉一次正则
+	}
+	return ansiRE.ReplaceAllString(s, "")
+}
+
+// procAttr 组装子进程的启动属性：接管命令行 + 不建窗口。
+func procAttr(cmdline string) *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{
+		CmdLine:       "cmd.exe /c " + cmdline,
+		HideWindow:    true,
+		CreationFlags: createNoWindow,
+	}
+}
+
 // runStep 执行一个外部命令并把输出实时回调出去。
 //
 // 三个踩过的坑都体现在这里：
@@ -367,7 +404,7 @@ func runStep(ctx context.Context, dir, module, jdk, exe string, args []string, e
 	//   - 两个坑都实测踩过。CmdLine 让我们完全控制命令行文本，由我们自己保证引号正确。
 	full := "chcp 65001 >nul && " + cmdline
 	cmd := exec.CommandContext(ctx, "cmd.exe")
-	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: "cmd.exe /c " + full}
+	cmd.SysProcAttr = procAttr(full)
 	cmd.Dir = dir
 	cmd.Env = buildEnv(jdk)
 
@@ -389,7 +426,11 @@ func runStep(ctx context.Context, dir, module, jdk, exe string, args []string, e
 		sc := bufio.NewScanner(r)
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
-			emit(Event{Kind: "log", Module: module, Line: sc.Text()})
+			line := stripANSI(sc.Text())
+			if strings.TrimSpace(line) == "" {
+				continue // 剥掉颜色码后可能只剩空白，不必推给界面
+			}
+			emit(Event{Kind: "log", Module: module, Line: line})
 		}
 	}
 	wg.Add(2)
@@ -500,11 +541,14 @@ func withEncodingOpts(env []string) []string {
 }
 
 // killTree 终止进程及其所有子进程。
+//
+// 同样要禁止建窗口：取消打包时会调它，否则会闪一个 taskkill 黑窗。
 func killTree(pid int) {
 	if pid <= 0 {
 		return
 	}
 	c := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(pid))
+	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 	_ = c.Run()
 }
 
@@ -604,6 +648,63 @@ func filterEnvFiles(assemblyDir, keepEnv string) (int, error) {
 		removed++
 	}
 	return removed, nil
+}
+
+// NormalizeConfig 规整配置里的模块 Root，必要时原地改写。
+//
+// 为什么需要「自愈」而不只是运行期容错：
+// resolveModuleDir 能在预检与打包时兜住错误的 Root，但配置文件本身
+// 仍然带着错值——界面显示、用户核对、别人接手时都会困惑
+// （实测出现过 D:\code\wic-sh\wic-sh\wic-admin 这种项目目录重复的路径）。
+// 所以在加载与保存时把 Root 改写成正确值并落盘，让配置回到自洽状态。
+//
+// 返回是否发生了改写，调用方据此决定要不要保存。
+func NormalizeConfig(cfg *Config, base string) bool {
+	if cfg == nil || strings.TrimSpace(base) == "" || !dirExists(base) {
+		return false
+	}
+	changed := false
+
+	for pi := range cfg.Projects {
+		proj := &cfg.Projects[pi]
+		projAbs := filepath.Join(base, filepath.FromSlash(strings.TrimSpace(proj.Root)))
+		if !dirExists(projAbs) {
+			// 项目根不存在时不动它——那是另一类问题（代码被移走/删了），
+			// 由预检明确报错，比这里猜一个路径更安全。
+			continue
+		}
+		for mi := range proj.Modules {
+			mod := &proj.Modules[mi]
+
+			primary := resolveModuleDir(base, *proj, *mod)
+			// 已经是自洽的（主候选就存在）→ 不改
+			cur := filepath.Join(base, filepath.FromSlash(strings.TrimSpace(proj.Root)))
+			wantRoot := strings.TrimSpace(mod.Root)
+			if wantRoot == "" {
+				wantRoot = mod.Name
+			}
+			if dirExists(filepath.Join(cur, filepath.FromSlash(wantRoot))) {
+				continue
+			}
+
+			// 主候选不存在但找到了真实目录 → 用相对项目根的路径改写
+			rel, err := filepath.Rel(projAbs, primary)
+			if err != nil {
+				continue
+			}
+			if strings.HasPrefix(rel, "..") {
+				// 真实目录在项目根之外，说明不是「Root 写错」而是配置本身不对，
+				// 不擅自杀成外部路径
+				continue
+			}
+			rel = filepath.ToSlash(rel)
+			if rel != mod.Root {
+				mod.Root = rel
+				changed = true
+			}
+		}
+	}
+	return changed
 }
 
 // resolveModuleDir 解析模块目录。
