@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows 助手</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --border:#2a2f3a;
+    --fg:#e6e8ec; --muted:#9aa1ad; --accent:#60a5fa; --accent-soft:#1e293b;
+    --danger:#f87171; --danger-soft:#3b1d1d; --warn:#fbbf24; --warn-soft:#3a2f10;
+    --bar:linear-gradient(90deg,#2563eb,#3b82f6);
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--fg);
+    font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    user-select:none;
+  }
+  .wrap { max-width:1240px; margin:0 auto; padding:20px 22px 28px; }
+  .mono { font-family:ui-monospace,"Cascadia Mono",Consolas,monospace; font-size:12.5px; user-select:text; }
+  h1 { font-size:19px; margin:0; letter-spacing:-.01em; }
+  h1 small { font-size:11.5px; font-weight:400; color:var(--muted); margin-left:8px; }
+  .sub { color:var(--muted); font-size:12.5px; margin-top:2px; }
+
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; }
+  .pad { padding:14px; }
+
+  /* 控制区 */
+  .ctrl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px; }
+  select, button {
+    font:inherit; font-size:13.5px; color:var(--fg); background:var(--panel2);
+    border:1px solid var(--border); border-radius:7px; padding:8px 14px; cursor:pointer;
+  }
+  select:hover, button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#0b1220; font-weight:600; }
+  button.primary:disabled { opacity:.45; cursor:not-allowed; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  label.chk { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:13px; cursor:pointer; }
+
+  .progress { height:8px; border-radius:5px; background:var(--border); overflow:hidden; margin-top:12px; }
+  .progress > i { display:block; height:100%; width:0; background:var(--bar); transition:width .25s; }
+  .progress.indeterminate > i { width:35% !important; animation:slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0%{margin-left:-35%} 100%{margin-left:100%} }
+  .pline { color:var(--muted); font-size:12.5px; margin-top:7px; min-height:18px;
+           display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .pline .cur { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; }
+
+  /* 卡片 */
+  .cards { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); margin:16px 0; }
+  .stat .k { color:var(--muted); font-size:12px; }
+  .stat .v { font-size:21px; font-weight:650; margin-top:2px; letter-spacing:-.02em; }
+  .stat .s { color:var(--muted); font-size:12px; margin-top:2px; }
+  .card.crit .v { color:var(--danger); }
+  .card.crit .bar > i { background:var(--danger); }
+
+  /* 告警 */
+  .banner { border:1px solid var(--border); background:var(--warn-soft); border-radius:10px;
+            padding:11px 14px; margin-bottom:14px; }
+  .banner .t { color:var(--warn); font-weight:600; margin-bottom:5px; font-size:13px; }
+  .banner ul { margin:0; padding-left:18px; }
+  .banner li { margin:2px 0; font-size:12.5px; }
+
+  /* 表格 */
+  .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); padding:0 8px;
+          background:var(--panel2); flex-wrap:wrap; align-items:center; }
+  .tabs button.t { appearance:none; background:none; border:0; border-bottom:2px solid transparent;
+                   color:var(--muted); padding:11px 12px; cursor:pointer; font:inherit; font-size:13.5px; }
+  .tabs button.t.on { color:var(--accent); border-bottom-color:var(--accent); }
+  .tabs .sp { flex:1; }
+  .tabs input { margin:6px 0; padding:6px 10px; min-width:190px; border:1px solid var(--border);
+                border-radius:6px; background:var(--panel); color:var(--fg); font:inherit; font-size:13px; }
+  .bodybox { max-height:520px; overflow:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead th { position:sticky; top:0; background:var(--panel2); text-align:left; font-weight:600;
+             font-size:12px; color:var(--muted); padding:9px 12px; border-bottom:1px solid var(--border);
+             white-space:nowrap; cursor:pointer; user-select:none; z-index:1; }
+  thead th:hover { color:var(--fg); }
+  th.num, td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tbody td { padding:7px 12px; border-bottom:1px solid var(--border); }
+  tbody tr:hover { background:var(--panel2); }
+  td.path { word-break:break-all; }
+  .cellbar { position:relative; min-width:110px; }
+  .cellbar > i { display:block; height:16px; background:var(--accent-soft); border-radius:3px; min-width:2px; }
+  .cellbar > span { position:absolute; left:6px; top:0; line-height:16px; font-size:11.5px; }
+  .badge { display:inline-block; font-size:11px; padding:1px 6px; border-radius:999px; margin-left:6px; }
+  .b-link { background:var(--accent-soft); color:var(--accent); }
+  .b-sum  { background:var(--border); color:var(--muted); }
+  .b-warn { background:var(--danger-soft); color:var(--danger); }
+
+  .kv { padding:4px 16px 14px; }
+  .kv div { display:flex; gap:16px; padding:7px 0; border-bottom:1px solid var(--border); }
+  .kv div:last-child { border-bottom:0; }
+  .kv b { flex:0 0 190px; font-weight:500; color:var(--muted); }
+  .kv span { flex:1; white-space:pre-wrap; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; user-select:text; }
+
+  .empty { padding:56px 20px; text-align:center; color:var(--muted); }
+  .empty .big { font-size:15px; color:var(--fg); margin-bottom:6px; }
+  .hidden { display:none !important; }
+  footer { color:var(--muted); font-size:12px; padding:14px 2px 0; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .err { color:var(--danger); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Windows 助手<small id="ver"></small></h1>
+  <div class="sub" id="envline">磁盘空间治理：先看清空间去哪了，再决定删什么、搬什么</div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="ctrl">
+      <span style="color:var(--muted);font-size:13px">扫描目标</span>
+      <select id="disk"></select>
+      <label class="chk"><input type="checkbox" id="deep"> 深度模式<span style="color:var(--muted)">(精确但慢)</span></label>
+      <button class="primary" id="btnStart">开始扫描</button>
+      <button id="btnCancel" class="hidden">取消</button>
+      <span id="envStatus" style="color:var(--muted);font-size:12.5px"></span>
+    </div>
+    <div class="pad hidden" id="progwrap" style="padding-top:0">
+      <div class="progress" id="pbar"><i></i></div>
+      <div class="pline">
+        <span id="pstat"></span>
+        <span class="cur mono" id="pcur"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="banners"></div>
+  <div id="results"></div>
+
+  <div class="card" id="empty">
+    <div class="empty">
+      <div class="big">还没有扫描结果</div>
+      <div>选择扫描目标后点击「开始扫描」。扫描是只读操作，不会改动任何文件，也不需要管理员权限。</div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="footnote">本工具当前只读：不删除、不迁移、不修改系统设置。清理功能在后续版本提供。</span>
+    <span><button id="btnExport" class="hidden">导出 HTML 报告</button></span>
+  </footer>
+</div>
+
+<script>
+const App = () => window.go.main.App;
+
+let pollTimer = null;
+let lastKey = '';
+
+function el(id) { return document.getElementById(id); }
+
+function fmtBytes(n) {
+  if (n == null) return '-';
+  const u = 1024;
+  if (n < u) return n + ' B';
+  const names = ['KB','MB','GB','TB','PB'];
+  let v = n, i = -1;
+  while (v >= u && i < names.length - 1) { v /= u; i++; }
+  return (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + ' ' + names[i];
+}
+function fmtCount(n) { return (n == null ? '-' : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')); }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  async function init() {
+    // 卷列表
+    // 注意：后端走 JSON 序列化，字段是 snake_case（model.Volume 的 json tag），
+    // 不是 Go 的字段名。之前写成 v.Letter/v.FreeBytes 导致界面显示 undefined。
+    try {
+      const vols = await App().Volumes() || [];
+      const sel = el('disk');
+      sel.innerHTML = vols.map(v =>
+        `<option value="${esc(v.letter)}" ${v.is_system ? 'selected' : ''}>${esc(v.letter)}: ${esc(v.label || '')}（剩余 ${fmtBytes(v.free_bytes)}）</option>`
+      ).join('');
+    } catch (e) { console.warn(e); }
+
+    // 环境自检（cli.Check 的 json tag 同样是 snake_case）
+    try {
+      const checks = await App().Doctor() || [];
+      const bad = checks.filter(c => !c.ok);
+      el('envStatus').textContent = checks.length
+        ? '环境：' + checks.map(c => c.name + ' ' + (c.ok ? '✓' : '✗')).join(' · ')
+        : '';
+      el('envStatus').title = checks.map(c => c.name + '：' + c.result).join('\n');
+      if (bad.length) el('envStatus').style.color = 'var(--warn)';
+    } catch (e) { console.warn(e); }
+
+  el('btnStart').addEventListener('click', startScan);
+  el('btnCancel').addEventListener('click', () => App().CancelScan());
+  el('btnExport').addEventListener('click', async () => {
+    try {
+      const p = await App().ExportReport();
+      appendBanner('ok', '已生成并打开 HTML 报告：' + p);
+    } catch (e) { appendBanner('warn', String(e)); }
+  });
+}
+
+function appendBanner(kind, text) {
+  const cls = kind === 'ok' ? 'b-link' : 'b-warn';
+  const color = kind === 'ok' ? 'var(--accent)' : 'var(--warn)';
+  const box = el('banners');
+  const div = document.createElement('div');
+  div.className = 'banner';
+  div.innerHTML = `<div class="t" style="color:${color}">${kind === 'ok' ? '完成' : '提示'}</div><div style="font-size:12.5px">${esc(text)}</div>`;
+  box.appendChild(div);
+  setTimeout(() => div.remove(), 12000);
+}
+
+async function startScan() {
+  const disk = el('disk').value;
+  const deep = el('deep').checked;
+  try { await App().StartScan(disk, deep); } catch (e) { appendBanner('warn', String(e)); return; }
+
+  el('btnStart').disabled = true;
+  el('btnCancel').classList.remove('hidden');
+  el('progwrap').classList.remove('hidden');
+  el('empty').classList.add('hidden');
+  el('results').innerHTML = '';
+  el('banners').innerHTML = '';
+  el('pbar').classList.add('indeterminate');
+
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(poll, 200);
+  poll();
+}
+
+async function poll() {
+  let p;
+  try { p = await App().Progress(); } catch (e) { return; }
+
+  // 字段名遵循后端 ProgressDTO 的 json tag（snake_case）。
+  // 特别注意 p.running：如果误写成 p.Running 会得到 undefined（falsy），
+  // 轮询会在第一次就误判「扫描已结束」而提前退出。
+  el('pstat').textContent =
+    `${fmtCount(p.files)} 文件 · ${fmtCount(p.dirs)} 目录 · ${fmtBytes(p.bytes)} · 跳过 ${fmtCount(p.skipped)} · ${(p.elapsed_ms/1000).toFixed(1)}s`;
+  el('pcur').textContent = p.current || '';
+  el('pcur').title = p.current || '';
+
+  if (!p.running) {
+    clearInterval(pollTimer); pollTimer = null;
+    el('pbar').classList.remove('indeterminate');
+    el('pbar').querySelector('i').style.width = '100%';
+    el('btnStart').disabled = false;
+    el('btnCancel').classList.add('hidden');
+
+    if (p.error) { appendBanner('warn', '扫描出错：' + p.error); }
+    const res = await App().Result();
+    if (res) { render(res); el('btnExport').classList.remove('hidden'); }
+    else { appendBanner('warn', '扫描已结束但没有得到结果，请重试'); }
+  }
+}
+
+function render(res) {
+  const s = res.stats || {};
+  let html = '';
+
+  if ((res.warnings || []).length) {
+    html += `<div class="banner"><div class="t">需要注意</div><ul>${
+      res.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
+  }
+
+  // 卡片
+  html += '<div class="cards">';
+  (res.volumes || []).forEach(v => {
+    if (!v.scanned && !v.is_system) return;
+    const pct = v.used_bytes ? (v.used_bytes / v.total_bytes * 100) : 0;
+    const crit = pct > 90;
+    html += `<div class="card stat${crit ? ' crit' : ''}">
+      <div class="k">${esc(v.letter)}: ${esc(v.label||'—')} · ${esc(v.file_system)}${v.is_system ? ' · 系统盘' : ''}</div>
+      <div class="v">${pct.toFixed(1)}%</div>
+      <div class="s">已用 ${fmtBytes(v.used_bytes)} / ${fmtBytes(v.total_bytes)} · 剩余 ${fmtBytes(v.free_bytes)}</div>
+      <div class="bar" style="height:6px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:8px">
+        <i style="display:block;height:100%;width:${pct.toFixed(1)}%;background:${crit ? 'var(--danger)' : 'var(--bar)'}"></i></div>
+    </div>`;
+  });
+  html += `<div class="card stat"><div class="k">统计到的占用</div><div class="v">${fmtBytes(s.bytes_on_disk)}</div>
+           <div class="s">逻辑大小 ${fmtBytes(s.bytes_logical)}</div></div>`;
+  html += `<div class="card stat"><div class="k">扫描规模</div><div class="v">${fmtCount(s.files_scanned)}</div>
+           <div class="s">文件 · ${fmtCount(s.dirs_scanned)} 目录 · ${(res.duration_ms/1000).toFixed(1)}s</div></div>`;
+  html += '</div>';
+
+  // 表格
+  html += `<div class="card">
+    <div class="tabs">
+      <button class="t on" data-tab="dirs">目录占用</button>
+      <button class="t" data-tab="files">最大文件</button>
+      <button class="t" data-tab="stats">统计</button>
+      <div class="sp"></div>
+      <input id="q" type="search" placeholder="过滤路径…">
+    </div>
+    <div class="bodybox" id="tab-dirs"><table><thead><tr>
+        <th class="num">占用</th><th class="num">逻辑大小</th><th class="num">文件数</th><th class="num">深度</th><th>路径</th>
+      </tr></thead><tbody>${
+      (res.dirs || []).map(d => {
+        let badge = '', bk = '';
+        if (d.is_reparse) { badge = '链接 ' + (d.reparse_tag || ''); bk = 'b-link'; }
+        else if (d.summary_only) { badge = '仅汇总'; bk = 'b-sum'; }
+        else if (d.skipped) { badge = '未读全'; bk = 'b-warn'; }
+        const path = d.is_reparse && d.link_target ? d.path + ' → ' + d.link_target : d.path;
+        return `<tr data-p="${esc(path)}">
+          <td class="num">${fmtBytes(d.on_disk)}</td>
+          <td class="num">${fmtBytes(d.logical)}</td>
+          <td class="num">${fmtCount(d.files)}</td>
+          <td class="num">${d.depth}</td>
+          <td class="path mono">${esc(path)}${badge ? `<span class="badge ${bk}">${esc(badge)}</span>` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>
+    <div class="bodybox hidden" id="tab-files"><table><thead><tr>
+        <th class="num">占用</th><th class="num">逻辑大小</th><th>修改时间</th><th>路径</th>
+      </tr></thead><tbody>${
+      (res.largest_files || []).map(f => `<tr data-p="${esc(f.path)}">
+          <td class="num">${fmtBytes(f.on_disk)}</td>
+          <td class="num">${fmtBytes(f.logical)}</td>
+          <td>${f.mtime ? f.mtime.substring(0,10) : '—'}</td>
+          <td class="path mono">${esc(f.path)}</td>
+        </tr>`).join('')}</tbody></table></div>
+    <div class="hidden" id="tab-stats"><div class="kv">${
+      [
+        ['扫描文件数', fmtCount(s.files_scanned)],
+        ['扫描目录数', fmtCount(s.dirs_scanned)],
+        ['占用（实际）', fmtBytes(s.bytes_on_disk)],
+        ['占用（逻辑）', fmtBytes(s.bytes_logical)],
+        ['卷实际已用', fmtBytes(s.volume_used_bytes)],
+        ['重解析点', fmtCount(s.reparse_points)],
+        ['硬链接去重', s.hard_link_dedup ? `${fmtCount(s.hard_links_deduped)} 个（共 ${fmtCount(s.hard_link_files)} 个含硬链接）` : '未启用（快速模式）'],
+        ['云占位/稀疏', fmtCount(s.cloud_placeholders)],
+        ['跳过目录（权限）', fmtCount(s.skipped_dirs)],
+        ['读取错误', fmtCount(s.errors)],
+        ['最大深度', String(s.max_depth_reached)],
+      ].map(([k, v]) => `<div><b>${k}</b><span>${esc(v)}</span></div>`).join('')
+    }</div>
+    <div class="note" style="color:var(--muted);font-size:12.5px;padding:12px 16px;border-top:1px solid var(--border)">
+      ${s.hard_link_dedup ? '深度模式：已按文件索引去重硬链接。' : '快速模式未去重硬链接：NTFS 硬链接会被重复计入，C:\\Windows 这类目录体积会偏高。用深度模式可得精确值。'}
+      ${s.volume_used_bytes ? ' 扫描统计与卷实际已用的差异包含两个方向的误差（高估与低估），数字接近不代表覆盖完整。' : ''}
+    </div></div>
+  </div>`;
+
+  el('results').innerHTML = html;
+  wireTabs();
+}
+
+function wireTabs() {
+  const btns = document.querySelectorAll('.tabs button.t');
+  const panes = { dirs: 'tab-dirs', files: 'tab-files', stats: 'tab-stats' };
+  btns.forEach(b => b.addEventListener('click', () => {
+    btns.forEach(x => x.classList.toggle('on', x === b));
+    Object.entries(panes).forEach(([k, id]) => el(id).classList.toggle('hidden', k !== b.dataset.tab));
+    const q = el('q');
+    q.style.visibility = b.dataset.tab === 'stats' ? 'hidden' : 'visible';
+  }));
+
+  const q = el('q');
+  q.addEventListener('input', () => {
+    const n = q.value.toLowerCase();
+    document.querySelectorAll('#results tbody tr').forEach(tr => {
+      tr.classList.toggle('hidden', n !== '' && !(tr.dataset.p || '').toLowerCase().includes(n));
+    });
+  });
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

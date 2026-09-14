@@ -16,6 +16,45 @@ import (
 	"winclean/internal/winapi"
 )
 
+// Check 是一条环境自检结果。
+type Check struct {
+	Name   string `json:"name"`
+	Result string `json:"result"`
+	OK     bool   `json:"ok"`
+}
+
+// RunDoctorChecks 执行可复用的环境能力检查。
+//
+// 抽成独立函数的原因：CLI 的 doctor 命令与 GUI 的首页都要展示同一份信息，
+// 两者必须来自同一处实现，否则会出现「命令行说正常、界面说异常」的分裂。
+func RunDoctorChecks() []Check {
+	var out []Check
+
+	elevated := sys.IsElevated()
+	if elevated {
+		out = append(out, Check{"管理员权限", "是（已提权），可读取大部分系统区域", true})
+	} else {
+		out = append(out, Check{"管理员权限", "否（普通用户）：回收站/卷影副本等区域不可读，总量会偏小", true})
+	}
+
+	// 硬链接去重依赖文件索引，而文件索引只能通过 GetFileInformationByHandle
+	// 获得（目录枚举结果里的对应字段是保留字段，实测恒为 0）。
+	idOK, idDetail := checkFileIDCapability()
+	out = append(out, Check{"硬链接去重能力", idDetail, idOK})
+
+	// 找不到可验证的样本不算故障，只说明无从验证，因此 OK 恒为 true。
+	_, tagDetail := checkReparseRead()
+	out = append(out, Check{
+		Name:   "重解析点识别",
+		Result: tagDetail,
+		OK:     true,
+	})
+
+	out = append(out, Check{"UTF-8 代码页", "已设置（65001）", true})
+
+	return out
+}
+
 // cmdDoctor 做环境自检。
 //
 // 把它做成最早可用的命令是有意的：权限、编码、文件索引可用性这些基础问题
@@ -78,36 +117,17 @@ func cmdDoctor(args []string) int {
 	}
 
 	// ── 遍历能力 ────────────────────────────────────────
+	// 与 GUI 首页共用同一份检查实现（RunDoctorChecks），避免两处结论不一致。
 	report.Section(w, "扫描能力")
 	ct := report.New([]string{"检查项", "结果"}, false, false)
-
-	// 硬链接去重依赖文件索引，而文件索引只能通过 GetFileInformationByHandle
-	// 获得（目录枚举结果里的对应字段是保留字段，实测恒为 0）。
-	// 这里实测这条链路是否可用，并说明它对扫描精度的影响。
-	idOK, idDetail := checkFileIDCapability()
-
-	ct.Add("UTF-8 代码页", "已设置（65001）")
-	if idOK {
-		ct.Add("硬链接去重能力", "可用（"+idDetail+"）")
-	} else {
-		ct.Add("硬链接去重能力", "不可用 ← "+idDetail+"；NTFS 硬链接会被重复计入，体积可能偏高")
+	idOK := false
+	for _, c := range RunDoctorChecks() {
+		ct.Add(c.Name, c.Result)
+		if strings.Contains(c.Name, "硬链接") {
+			idOK = c.OK
+		}
 	}
 	ct.Add("逻辑 CPU 数", fmt.Sprintf("%d", runtime.NumCPU()))
-
-	// 重解析点识别：找一个已知的链接来验证读取链路
-	tagOK, tagDetail := checkReparseRead()
-	if tagOK {
-		ct.Add("重解析点识别", "可用（"+tagDetail+"）")
-	} else {
-		ct.Add("重解析点识别", "未找到样本来验证（不影响功能）")
-	}
-
-	// 权限对扫描完整性的影响
-	if elevated {
-		ct.Add("扫描完整度", "已提权，可读取大部分系统区域")
-	} else {
-		ct.Add("扫描完整度", "普通用户：回收站/卷影副本等区域不可读，总量会偏小")
-	}
 	ct.Render(w)
 
 	// ── 系统「只汇总不展开」目录 ────────────────────────

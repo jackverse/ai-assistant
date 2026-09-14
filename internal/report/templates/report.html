@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>winclean 磁盘空间报告</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --panel2: #fafbfc; --border: #e3e6ea;
+    --fg: #1c2024; --muted: #6b7280; --accent: #2563eb; --accent-soft: #dbeafe;
+    --danger: #dc2626; --danger-soft: #fee2e2; --warn: #b45309; --warn-soft: #fef3c7;
+    --ok: #047857; --ok-soft: #d1fae5; --bar: linear-gradient(90deg,#3b82f6,#60a5fa);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --panel: #171a21; --panel2: #1d2129; --border: #2a2f3a;
+      --fg: #e6e8ec; --muted: #9aa1ad; --accent: #60a5fa; --accent-soft: #1e293b;
+      --danger: #f87171; --danger-soft: #3b1d1d; --warn: #fbbf24; --warn-soft: #3a2f10;
+      --ok: #34d399; --ok-soft: #10281f; --bar: linear-gradient(90deg,#2563eb,#3b82f6);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+    font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h1 .tag {
+    font-size: 11px; font-weight: 500; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px;
+    margin-left: 8px; vertical-align: middle;
+  }
+  .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 18px; }
+  .meta b { color: var(--fg); font-weight: 600; }
+
+  .banner {
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+    border: 1px solid var(--border); background: var(--panel);
+  }
+  .banner.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+  .banner .t { font-weight: 600; margin-bottom: 6px; color: var(--warn); }
+  .banner ul { margin: 0; padding-left: 18px; }
+  .banner li { margin: 3px 0; }
+
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .card .k { color: var(--muted); font-size: 12px; }
+  .card .v { font-size: 22px; font-weight: 650; margin-top: 2px; letter-spacing: -.02em; }
+  .card .s { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .card.crit .v { color: var(--danger); }
+
+  .bar { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; margin-top: 8px; }
+  .bar > i { display: block; height: 100%; background: var(--bar); }
+  .bar.crit > i { background: var(--danger); }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 8px; background: var(--panel2); flex-wrap: wrap; }
+  .tabs button {
+    appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
+    color: var(--muted); font: inherit; font-weight: 500; padding: 11px 12px; cursor: pointer;
+  }
+  .tabs button:hover { color: var(--fg); }
+  .tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .tabs .spacer { flex: 1; }
+  .tabs input {
+    align-self: center; margin: 6px 0; padding: 6px 10px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--panel);
+    color: var(--fg); font: inherit; font-size: 13px;
+  }
+  .body { max-height: 620px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; z-index: 1; background: var(--panel2);
+    text-align: left; font-weight: 600; font-size: 12px; color: var(--muted);
+    padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap;
+    cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--fg); }
+  thead th.num, tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:hover { background: var(--panel2); }
+  tbody td.path { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; word-break: break-all; }
+  td .cellbar { position: relative; }
+  td .cellbar > i { display: block; height: 16px; background: var(--accent-soft); border-radius: 3px; min-width: 2px; }
+  td .cellbar > span { position: absolute; left: 6px; top: 0; line-height: 16px; font-size: 11.5px; }
+
+  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; margin-left: 6px; white-space: nowrap; }
+  .badge-link { background: var(--accent-soft); color: var(--accent); }
+  .badge-summary { background: var(--border); color: var(--muted); }
+  .badge-warn { background: var(--danger-soft); color: var(--danger); }
+
+  .kv { padding: 4px 16px 14px; }
+  .kv div { display: flex; gap: 16px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .kv div:last-child { border-bottom: 0; }
+  .kv b { flex: 0 0 190px; font-weight: 500; color: var(--muted); }
+  .kv span { flex: 1; white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+
+  .note { color: var(--muted); font-size: 12.5px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--panel2); }
+  .note b { color: var(--warn); }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 0 20px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>winclean 磁盘空间报告<span class="tag">{{.ToolVersion}}</span></h1>
+  <div class="meta">
+    扫描于 <b>{{.ScannedAt}}</b> · 耗时 <b>{{.Duration}}</b> · {{.Mode}} · 扫描根 <b>{{.Roots}}</b>
+  </div>
+
+  {{if .Warnings}}
+  <div class="banner warn">
+    <div class="t">需要注意</div>
+    <ul>{{range .Warnings}}<li>{{.}}</li>{{end}}</ul>
+  </div>
+  {{end}}
+
+  <div class="cards">
+    {{range .Volumes}}
+    <div class="card{{if .Critical}} crit{{end}}">
+      <div class="k">{{.Letter}} {{.Label}} · {{.FileSystem}}{{if .IsSystem}} · 系统盘{{end}}</div>
+      <div class="v">{{.UsedPct}}</div>
+      <div class="s">已用 {{.Used}} / {{.Total}} · 剩余 {{.Free}}</div>
+      <div class="bar{{if .Critical}} crit{{end}}"><i style="width: {{.UsedPctNum}}%"></i></div>
+    </div>
+    {{end}}
+    <div class="card">
+      <div class="k">统计到的占用</div>
+      <div class="v">{{.TotalOnDisk}}</div>
+      <div class="s">逻辑大小 {{.TotalLogical}}</div>
+    </div>
+    <div class="card">
+      <div class="k">扫描规模</div>
+      <div class="v">{{.ScannedFiles}}</div>
+      <div class="s">文件 · {{.ScannedDirs}} 目录</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="tabs">
+      <button class="on" data-tab="dirs">目录占用（{{.DirCount}}）</button>
+      <button data-tab="files">最大文件（{{.FileCount}}）</button>
+      <button data-tab="stats">统计</button>
+      <div class="spacer"></div>
+      <input id="q" type="search" placeholder="过滤路径…（仅作用于当前表）">
+    </div>
+
+    <div class="body" id="tab-dirs">
+      <table id="tbl-dirs">
+        <thead>
+          <tr>
+            <th class="num" data-sort="size">占用</th>
+            <th class="num" data-sort="logical">逻辑大小</th>
+            <th class="num" data-sort="count">文件数</th>
+            <th class="num" data-sort="depth">深度</th>
+            <th data-sort="path">路径</th>
+          </tr>
+        </thead>
+        <tbody>
+        {{range .Dirs}}
+          <tr data-s="{{.SortSize}}" data-c="{{.SortCount}}" data-d="{{.SortDepth}}" data-p="{{.Path}}">
+            <td class="num"><div class="cellbar"><i style="width: {{.BarPct}}%"></i><span>{{.Size}}</span></div></td>
+            <td class="num">{{.Logical}}</td>
+            <td class="num">{{.Count}}</td>
+            <td class="num">{{.Depth}}</td>
+            <td class="path">{{.Path}}{{if .Badge}}<span class="badge {{.BadgeKind}}">{{.Badge}}</span>{{end}}</td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="body hidden" id="tab-files">
+      <table id="tbl-files">
+        <thead>
+          <tr>
+            <th class="num" data-sort="size">占用</th>
+            <th class="num" data-sort="logical">逻辑大小</th>
+            <th data-sort="count">修改时间</th>
+            <th data-sort="path">路径</th>
+          </tr>
+        </thead>
+        <tbody>
+        {{range .Files}}
+          <tr data-s="{{.SortSize}}" data-c="0" data-d="0" data-p="{{.Path}}">
+            <td class="num"><div class="cellbar"><i style="width: {{.BarPct}}%"></i><span>{{.Size}}</span></div></td>
+            <td class="num">{{.Logical}}</td>
+            <td>{{.Count}}</td>
+            <td class="path">{{.Path}}{{if .Badge}}<span class="badge {{.BadgeKind}}">{{.Badge}}</span>{{end}}</td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="body hidden" id="tab-stats">
+      <div class="kv">
+        {{range .Stats}}<div><b>{{.Key}}</b><span>{{.Value}}</span></div>{{end}}
+      </div>
+      <div class="note">
+        {{if .HardLinkNote}}{{.HardLinkNote}}<br><br>{{end}}
+        {{if .CoverageNote}}{{.CoverageNote}}{{end}}
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    由 winclean 生成 · 本报告为静态文件，未引用任何外部资源，也不会上传任何数据
+  </footer>
+</div>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.tabs button[data-tab]');
+  var panes = { dirs: 'tab-dirs', files: 'tab-files', stats: 'tab-stats' };
+  var current = 'dirs';
+
+  function show(name) {
+    current = name;
+    tabs.forEach(function (b) { b.classList.toggle('on', b.dataset.tab === name); });
+    Object.keys(panes).forEach(function (k) {
+      document.getElementById(panes[k]).classList.toggle('hidden', k !== name);
+    });
+    document.querySelector('.tabs input').style.visibility = (name === 'stats') ? 'hidden' : 'visible';
+  }
+  tabs.forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.tab); }); });
+
+  // 过滤：只作用于当前可见的表格
+  var q = document.getElementById('q');
+  q.addEventListener('input', function () {
+    var needle = q.value.toLowerCase();
+    var tbl = document.getElementById(current === 'files' ? 'tbl-files' : 'tbl-dirs');
+    if (!tbl) return;
+    tbl.querySelectorAll('tbody tr').forEach(function (tr) {
+      var hit = (tr.dataset.p || '').toLowerCase().indexOf(needle) >= 0;
+      tr.classList.toggle('hidden', !hit);
+    });
+  });
+
+  // 点击表头排序（同一列再次点击反转）
+  document.querySelectorAll('table').forEach(function (tbl) {
+    var dir = {};
+    tbl.querySelectorAll('thead th[data-sort]').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var key = th.dataset.sort;
+        dir[key] = !dir[key];
+        var asc = dir[key];
+        var rows = Array.prototype.slice.call(tbl.querySelectorAll('tbody tr'));
+        rows.sort(function (a, b) {
+          var va, vb;
+          if (key === 'size') { va = +a.dataset.s; vb = +b.dataset.s; }
+          else if (key === 'logical') { va = +a.dataset.s; vb = +b.dataset.s; }
+          else if (key === 'count') { va = +a.dataset.c; vb = +b.dataset.c; }
+          else if (key === 'depth') { va = +a.dataset.d; vb = +b.dataset.d; }
+          else { va = a.dataset.p || ''; vb = b.dataset.p || ''; return asc ? va.localeCompare(vb) : vb.localeCompare(va); }
+          return asc ? va - vb : vb - va;
+        });
+        var tb = tbl.querySelector('tbody');
+        rows.forEach(function (r) { tb.appendChild(r); });
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

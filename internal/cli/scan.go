@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -47,6 +48,8 @@ func cmdScan(args []string) int {
 		topFiles = fs.Int("top-files", scan.DefaultTopFiles, "收集的最大文件数")
 		topDirs  = fs.Int("top-dirs", 20, "报告中显示的目录条数")
 		quiet    = fs.Bool("quiet", false, "不显示进度")
+		htmlOut  = fs.String("html", "", "同时生成 HTML 报告到该路径")
+		openHTML = fs.Bool("open", false, "生成 HTML 后用浏览器打开")
 	)
 	output := "winclean-scan.json"
 	fs.StringVar(&output, "o", output, "scan.json 输出路径")
@@ -152,8 +155,30 @@ func cmdScan(args []string) int {
 		}
 		if *format != "json" {
 			fmt.Printf("\n完整结果已写入 %s\n", output)
-			fmt.Printf("后续可用：winclean dirs -i %s\n", output)
 		}
+	}
+
+	// HTML 报告：--open 单独出现时也要能用，所以补一个默认路径。
+	htmlPath := *htmlOut
+	if htmlPath == "" && *openHTML {
+		htmlPath = "winclean-report.html"
+	}
+	if htmlPath != "" {
+		if err := report.WriteHTML(htmlPath, res, 300); err != nil {
+			fmt.Fprintf(os.Stderr, "生成 HTML 报告失败：%v\n", err)
+			return ExitError
+		}
+		abs, _ := filepath.Abs(htmlPath)
+		fmt.Printf("HTML 报告已写入 %s\n", abs)
+		if *openHTML {
+			if err := OpenInBrowser(abs); err != nil {
+				fmt.Fprintf(os.Stderr, "自动打开失败（可手动双击该文件）：%v\n", err)
+			}
+		}
+	}
+
+	if !*noSave && *format != "json" {
+		fmt.Printf("后续可用：winclean dirs -i %s  /  winclean report --open\n", output)
 	}
 
 	if ctx.Err() != nil {
