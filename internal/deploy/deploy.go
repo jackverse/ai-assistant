@@ -267,7 +267,7 @@ func packBackend(ctx context.Context, cfg Config, modDir string, mod ModuleConfi
 		Line: fmt.Sprintf("环境过滤：保留 %s，移除 %d 个非 %s 配置文件",
 			cfg.effectiveKeepEnv(), removed, cfg.effectiveKeepEnv())})
 
-	zipPath := filepath.Join(outDir, mod.Output+"_war_exploded.zip")
+	zipPath := filepath.Join(outDir, sanitizeBackendOutput(mod.Output)+"_war_exploded.zip")
 	if err := zipDir(assembly, zipPath, mod.Name, emit); err != nil {
 		return "", err
 	}

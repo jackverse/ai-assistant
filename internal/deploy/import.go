@@ -84,6 +84,10 @@ func ImportExternalConfig(path string) (Config, error) {
 			}
 			if mc.Output == "" {
 				mc.Output = mc.Name
+				if mc.Type == "backend" {
+					// 与既有工具的产物命名保持一致：wic-admin → wic_admin
+					mc.Output = sanitizeBackendOutput(mc.Name)
+				}
 			}
 			// 前端模块缺 script 时给出提示而不是静默接受：
 			// 没有 script 就无法构建，早提示比跑到打包时失败好
