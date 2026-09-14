@@ -359,11 +359,11 @@ async function renderRail() {
   rail.innerHTML = '';
   mods.forEach(m => {
     if (!m.enabled) return;   // 禁用的模块不出现在导航
-    const meta = PAGE_META[m.meta.id] || { icon: m.meta.icon || '📄', name: m.meta.name, sub: m.meta.desc };
+    const meta = PAGE_META[m.id] || { icon: m.icon || '📄', name: m.name, sub: m.desc };
     const b = document.createElement('button');
-    b.dataset.page = m.meta.id;
+    b.dataset.page = m.id;
     b.innerHTML = `${meta.icon}<span class="tip">${esc(meta.name)}</span>`;
-    b.addEventListener('click', () => openPage(m.meta.id));
+    b.addEventListener('click', () => openPage(m.id));
     rail.appendChild(b);
   });
   // 设置按钮固定在底部
@@ -788,10 +788,10 @@ async function initSettings() {
   // 模块开关
   el('modlist').innerHTML = (s.modules || []).map(m => `
     <div class="modrow">
-      <span style="font-size:17px">${esc(m.meta.icon)}</span>
-      <div class="n"><b>${esc(m.meta.name)}</b><span class="d"> — ${esc(m.meta.desc)}</span></div>
-      <span class="muted" style="font-size:11.5px">${m.meta.status === 'ready' ? '可用' : m.meta.status === 'development' ? '开发中' : '规划中'}</span>
-      <label class="chk"><input type="checkbox" data-toggle="${esc(m.meta.id)}" ${m.enabled ? 'checked' : ''}>启用</label>
+      <span style="font-size:17px">${esc(m.icon)}</span>
+      <div class="n"><b>${esc(m.name)}</b><span class="d"> — ${esc(m.desc)}</span></div>
+      <span class="muted" style="font-size:11.5px">${m.status === 'ready' ? '可用' : m.status === 'development' ? '开发中' : '规划中'}</span>
+      <label class="chk"><input type="checkbox" data-toggle="${esc(m.id)}" ${m.enabled ? 'checked' : ''}>启用</label>
     </div>`).join('');
   el('modlist').querySelectorAll('input[data-toggle]').forEach(inp => {
     inp.addEventListener('change', async () => {

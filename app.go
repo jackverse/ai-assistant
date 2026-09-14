@@ -155,13 +155,45 @@ func (a *App) BootMS() int64 { return time.Since(procStart).Milliseconds() }
 
 // ───────── 主页解析与设置 ─────────
 
+// ModuleDTO / OpenModuleResult 是暴露给前端的模块视图。
+//
+// 刻意定义在 main 包而不是直接复用 internal/modules 的类型：
+// 实测（本机 GUI 验证）当绑定方法的签名直接引用 internal/modules 包的类型
+// （如 `Modules() []modules.ModuleView`）时，Wails 的运行时绑定会静默丢弃
+// 该方法（window.go.main.App 上没有它，调用即 "is not a function"），
+// 而同文件里引用 internal/model、internal/cli、internal/ai 类型的方法都正常。
+// 用 main 包 DTO 做一层转换即可绕开；顺带让前端与内部模型解耦。
+type ModuleDTO struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Desc      string `json:"desc"`
+	Icon      string `json:"icon"`
+	Status    string `json:"status"`
+	Enabled   bool   `json:"enabled"`
+	Opened    bool   `json:"opened"`
+	ConfigKey string `json:"config_key"`
+}
+
+type OpenModuleResult struct {
+	OK      bool   `json:"ok"`
+	Message string `json:"message"`
+}
+
+func toModuleDTO(m modules.ModuleView) ModuleDTO {
+	return ModuleDTO{
+		ID: m.Meta.ID, Name: m.Meta.Name, Desc: m.Meta.Desc, Icon: m.Meta.Icon,
+		Status: string(m.Meta.Status), Enabled: m.Enabled, Opened: m.Opened,
+		ConfigKey: m.ConfigKey,
+	}
+}
+
 // SettingsDTO 是设置页需要的全部信息。
 type SettingsDTO struct {
-	Home       string             `json:"home"`
-	Pages      []HomePageOption   `json:"pages"`
-	AI         AISettingsDTO      `json:"ai"`
-	ConfigPath string             `json:"config_path"`
-	Modules    []modules.ModuleView `json:"modules"`
+	Home       string           `json:"home"`
+	Pages      []HomePageOption `json:"pages"`
+	AI         AISettingsDTO    `json:"ai"`
+	ConfigPath string           `json:"config_path"`
+	Modules    []ModuleDTO      `json:"modules"`
 }
 
 type HomePageOption struct {
@@ -209,8 +241,26 @@ func (a *App) GetSettings() SettingsDTO {
 	}
 	s.AI.Configured = ai.Settings{BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model}.Valid()
 
-	s.Modules = a.reg.List()
+	for _, m := range a.reg.List() {
+		s.Modules = append(s.Modules, toModuleDTO(m))
+	}
 	return s
+}
+
+// ListModules 返回模块列表（含禁用的，前端以灰态展示并说明如何启用）。
+func (a *App) ListModules() []ModuleDTO {
+	list := a.reg.List()
+	out := make([]ModuleDTO, 0, len(list))
+	for _, m := range list {
+		out = append(out, toModuleDTO(m))
+	}
+	return out
+}
+
+// EnterModule 进入模块。首次进入触发该模块的懒加载初始化。
+func (a *App) EnterModule(id string) (OpenModuleResult, error) {
+	res, err := a.reg.Open(id)
+	return OpenModuleResult{OK: res.OK, Message: res.Message}, err
 }
 
 // resolveHome 解析启动主页，配置指向不可用页面时回退到第一个可用页。
@@ -233,14 +283,17 @@ func (a *App) resolveHome() string {
 		return want
 	}
 
-	// 配置里的主页不可用：挑一个合理的默认（AI 已配置优先聊天，否则扫描）
+	// 配置里的主页不可用（或从未设置）时的回退顺序：
+	//   AI 已配置 → 聊天页（它是这个形态下的主功能）
+	//   否则      → 磁盘扫描（工具形态的门面；绝不能拿一个
+	//               「需要先配置才能用」的页面当启动首页）
 	if m, ok := byID["chat"]; ok && m.Enabled && a.aiSettings().Valid() {
 		return "chat"
 	}
-	if firstReady != "" {
-		return firstReady
+	if _, ok := byID["scan"]; ok && byID["scan"].Enabled {
+		return "scan"
 	}
-	return "scan"
+	return firstReady
 }
 
 // HomePage 返回启动时应显示的页面 id。
@@ -267,20 +320,20 @@ func (a *App) SetHome(id string) error {
 // 这就是「需要用清理的时候把清理打开」的落地：
 // 开关即配置，配置即持久化，重启后依然生效。
 // 关闭的是当前主页时，主页自动回退（下次启动按 resolveHome 生效）。
-func (a *App) SetModuleEnabled(id string, enabled bool) (modules.ModuleView, error) {
+func (a *App) SetModuleEnabled(id string, enabled bool) (ModuleDTO, error) {
 	if !a.reg.SetEnabled(id, enabled) {
-		return modules.ModuleView{}, fmt.Errorf("未知模块: %s", id)
+		return ModuleDTO{}, fmt.Errorf("未知模块: %s", id)
 	}
 	a.cfg.SetEnabled(id, enabled)
 	if err := a.cfg.Save(); err != nil {
-		return modules.ModuleView{}, fmt.Errorf("写入配置失败: %w", err)
+		return ModuleDTO{}, fmt.Errorf("写入配置失败: %w", err)
 	}
 	for _, m := range a.reg.List() {
 		if m.Meta.ID == id {
-			return m, nil
+			return toModuleDTO(m), nil
 		}
 	}
-	return modules.ModuleView{}, nil
+	return ModuleDTO{}, nil
 }
 
 // ConfigPath 返回配置文件路径，供界面提示用户可手动编辑。
