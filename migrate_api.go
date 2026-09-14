@@ -9,11 +9,15 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"winclean/internal/migrate"
 	"winclean/internal/safeio"
+	"winclean/internal/sys"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -70,6 +74,17 @@ func (a *App) MigrateScan() error {
 			}
 		}()
 
+		// 保留用户手动添加的自定义目录（它们不随内置清单重扫而消失）
+		a.migMu.Lock()
+		var customs []migrate.Cand
+		for _, c := range a.migCands {
+			if strings.HasPrefix(c.ID, "custom:") {
+				customs = append(customs, c)
+			}
+		}
+		a.migCands = nil
+		a.migMu.Unlock()
+
 		cands := migrate.Catalog()
 		for i, c := range cands {
 			if ctx.Err() != nil {
@@ -83,6 +98,7 @@ func (a *App) MigrateScan() error {
 			}
 			cands[i] = c
 		}
+		cands = append(cands, customs...)
 		a.migScanCount.Store(int64(len(cands)))
 
 		a.migMu.Lock()
@@ -114,11 +130,26 @@ type MigrateItemDTO struct {
 	Name    string `json:"name"`
 	Path    string `json:"path"`
 	Size    int64  `json:"size"`
+	App     string `json:"app,omitempty"`
+	AppIcon string `json:"app_icon,omitempty"`
+	Role    string `json:"role,omitempty"`
 	EnvVar  string `json:"env_var,omitempty"`
 	EnvNow  string `json:"env_now,omitempty"`
 	Risk    string `json:"risk"`
 	RiskWhy string `json:"risk_why,omitempty"`
 	Note    string `json:"note,omitempty"`
+	// Custom 标记这是用户手动添加的目录（界面上可被移除）。
+	Custom bool `json:"custom,omitempty"`
+}
+
+func candToDTO(c migrate.Cand, custom bool) MigrateItemDTO {
+	return MigrateItemDTO{
+		ID: c.ID, Name: c.Name, Path: c.Path, Size: c.Size,
+		App: c.App, AppIcon: c.AppIcon, Role: string(c.Role),
+		EnvVar: c.EnvVar, EnvNow: c.EnvNow,
+		Risk: string(c.Risk), RiskWhy: c.RiskWhy, Note: c.Note,
+		Custom: custom,
+	}
 }
 
 // MigrateItems 返回检测完成的候选列表；未完成时返回 nil。
@@ -131,13 +162,70 @@ func (a *App) MigrateItems() []MigrateItemDTO {
 	}
 	out := make([]MigrateItemDTO, 0, len(cands))
 	for _, c := range cands {
-		out = append(out, MigrateItemDTO{
-			ID: c.ID, Name: c.Name, Path: c.Path, Size: c.Size,
-			EnvVar: c.EnvVar, EnvNow: c.EnvNow,
-			Risk: string(c.Risk), RiskWhy: c.RiskWhy, Note: c.Note,
-		})
+		out = append(out, candToDTO(c, strings.HasPrefix(c.ID, "custom:")))
 	}
 	return out
+}
+
+// MigrateAddPath 把用户指定的任意目录添加为迁移项（工作/数据/缓存地址
+// 不在已知清单里时的通用入口），同步测量大小后返回。
+//
+// role 取 "work"/"data"/"cache"（默认 data）；label 为空时用目录名。
+// 系统目录（C:\Windows、Program Files 等）会被拒绝——执行层预检也会再拦一次。
+func (a *App) MigrateAddPath(path, role, label string) (MigrateItemDTO, error) {
+	abs, err := sys.CleanAbsolute(path)
+	if err != nil {
+		return MigrateItemDTO{}, err
+	}
+	fi, err := os.Stat(abs)
+	if err != nil {
+		return MigrateItemDTO{}, fmt.Errorf("目录不可访问: %w", err)
+	}
+	if !fi.IsDir() {
+		return MigrateItemDTO{}, errors.New("请选择目录而不是文件")
+	}
+	if is, _, err := sys.IsReparsePoint(abs); err == nil && is {
+		return MigrateItemDTO{}, errors.New("该路径已是目录联接（可能迁移过）")
+	}
+	for _, root := range []string{"C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)"} {
+		if sys.IsUnder(abs, root) {
+			return MigrateItemDTO{}, fmt.Errorf("拒绝添加系统/程序目录 %s", abs)
+		}
+	}
+
+	switch role {
+	case "work":
+		role = string(migrate.RoleWork)
+	case "cache":
+		role = string(migrate.RoleCache)
+	default:
+		role = string(migrate.RoleData)
+	}
+	if strings.TrimSpace(label) == "" {
+		label = filepath.Base(abs)
+	}
+
+	a.migMu.Lock()
+	defer a.migMu.Unlock()
+	// 已存在（同路径）则不重复添加
+	for _, c := range a.migCands {
+		if strings.EqualFold(c.Path, abs) {
+			return candToDTO(c, strings.HasPrefix(c.ID, "custom:")), nil
+		}
+	}
+	a.migCustomSeq++
+	c := migrate.Cand{
+		ID:   fmt.Sprintf("custom:%d", a.migCustomSeq),
+		Name: strings.TrimSpace(label), Path: abs,
+		App: "自定义目录", AppIcon: "📁",
+		Role: migrate.Role(role), Risk: migrate.RiskMedium,
+		RiskWhy: "自定义目录：请自行确认对应软件已退出、该目录确可搬迁",
+	}
+	if sum, err := safeio.SumTree(context.Background(), abs); err == nil {
+		c.Size = sum.Bytes
+	}
+	a.migCands = append(a.migCands, c)
+	return candToDTO(c, true), nil
 }
 
 // MigrateResultDTO 是单个候选的迁移结果视图。
@@ -198,6 +286,23 @@ type MigrateJournalDTO struct {
 	Time  string                   `json:"time"`
 	Items []MigrateJournalItemDTO  `json:"items"`
 	Err   string                   `json:"err,omitempty"`
+}
+
+// MigrateRemoveCustom 移除一个自定义迁移项（仅限 custom: 前缀）。
+func (a *App) MigrateRemoveCustom(id string) error {
+	if !strings.HasPrefix(id, "custom:") {
+		return errors.New("内置迁移项不可移除")
+	}
+	a.migMu.Lock()
+	defer a.migMu.Unlock()
+	out := a.migCands[:0]
+	for _, c := range a.migCands {
+		if c.ID != id {
+			out = append(out, c)
+		}
+	}
+	a.migCands = out
+	return nil
 }
 
 // MigrateJournals 返回全部迁移记录（撤销界面的数据源）。

@@ -21,7 +21,10 @@ func TestRegistryListJSON(t *testing.T) {
 
 	// 断言必需模块存在，而不是硬编码总数——
 	// 否则每加一个功能入口都要改测试（本文件就被 deploy 模块撞过一次）
-	required := []string{"chat", "scan", "deploy", "clean", "migrate"}
+	//
+	// 历史：scan/clean/migrate 曾是三个独立模块，现已合并为「磁盘整理」(disk)，
+	// 三个功能以页签形态共存于同一页面。
+	required := []string{"chat", "disk", "deploy"}
 	byID := map[string]bool{}
 	for _, m := range list {
 		if m.Meta.ID == "" {
@@ -34,23 +37,26 @@ func TestRegistryListJSON(t *testing.T) {
 			t.Errorf("缺少必需模块 %q（已注册: %v）", id, keysOf(byID))
 		}
 	}
+	for _, id := range []string{"scan", "clean", "migrate"} {
+		if byID[id] {
+			t.Errorf("%s 已合并进 disk 模块，不应再单独注册", id)
+		}
+	}
 
 	// 默认启用状态：全部功能模块默认启用。
-	// clean/migrate 曾因「未实现」默认关闭；现已实现并上线，
-	// 反转断言防止将来有人无意把它们改回禁用。
 	enabled := map[string]bool{}
 	for _, m := range list {
 		enabled[m.Meta.ID] = m.Enabled
 	}
-	for _, id := range []string{"chat", "scan", "deploy", "clean", "migrate"} {
+	for _, id := range required {
 		if !enabled[id] {
 			t.Errorf("%s 应默认启用", id)
 		}
 	}
 
-	// 主页解析：默认配置（AI 未配置）应回退到 scan
-	if got := app.resolveHome(); got != "scan" {
-		t.Errorf("AI 未配置时主页应回退 scan，实际 %s", got)
+	// 主页解析：默认配置（AI 未配置）应回退到 disk（磁盘整理）
+	if got := app.resolveHome(); got != "disk" {
+		t.Errorf("AI 未配置时主页应回退 disk，实际 %s", got)
 	}
 
 	// 配置 AI 后，默认主页应为 chat

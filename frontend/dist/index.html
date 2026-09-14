@@ -465,8 +465,64 @@
         </div>
       </div>
 
-      <!-- 扫描页 -->
-      <div class="page" id="page-scan">
+      <!-- 磁盘整理：一键整理 / 空间扫描 / 垃圾清理 / 空间迁移 -->
+      <div class="page" id="page-disk">
+        <div class="row" style="justify-content:space-between;margin-bottom:18px">
+          <div class="segment">
+            <button data-tab="oneclick" class="on">一键整理</button>
+            <button data-tab="scan">空间扫描</button>
+            <button data-tab="clean">垃圾清理</button>
+            <button data-tab="migrate">空间迁移</button>
+          </div>
+          <span class="hint" id="diskTabHint"></span>
+        </div>
+
+        <!-- ────────── 一键整理 ────────── -->
+        <div id="dtab-oneclick">
+          <div class="card" id="ocIdle">
+            <div class="empty" style="padding:46px 24px">
+              <div class="big" style="font-size:17px">一键释放 C 盘空间</div>
+              <div class="s">自动找出可以<b style="color:var(--fg)">放心删除的垃圾文件</b>，和可以<b style="color:var(--fg)">搬到其他盘的大文件</b>。<br>
+                删除的只有临时文件和缓存；搬走的东西软件照常使用，随时可以撤销。<br>不会碰你的文档、聊天记录和任何系统文件。</div>
+              <div style="margin-top:22px"><button class="primary" id="ocStart" style="font-size:15px;padding:12px 36px">开始检测（约 10 秒）</button></div>
+            </div>
+          </div>
+
+          <div class="card hidden" id="ocDetecting">
+            <div class="pad">
+              <div class="progress indeterminate" id="ocBar"><i></i></div>
+            </div>
+            <div class="pad" id="ocDetectList" style="padding-top:0"></div>
+          </div>
+
+          <div class="card hidden" id="ocPlan">
+            <div class="card-head"><span class="t">检测完成，给你一个整理方案</span>
+              <span class="spacer"></span><span class="d" id="ocCdrive"></span></div>
+            <div class="pad" id="ocPlanBody"></div>
+            <div class="card-foot">
+              <span class="hint">搬走的东西先在新位置留一份「后悔药」，软件确认正常后还能删掉备份再省一倍空间</span>
+              <span class="spacer" style="flex:1"></span>
+              <button id="ocOnlyClean">只清理垃圾</button>
+              <button class="primary" id="ocDoAll">按方案整理</button>
+            </div>
+          </div>
+
+          <div class="card hidden" id="ocRunning">
+            <div class="card-head"><span class="t">正在整理</span><span class="spacer"></span><span class="hint" id="ocPhase"></span></div>
+            <div class="pad">
+              <div class="progress" id="ocRunBar"><i></i></div>
+              <div class="pline"><span id="ocRunStat"></span></div>
+            </div>
+          </div>
+
+          <div class="card hidden" id="ocDone">
+            <div class="card-head"><span class="t">整理完成</span></div>
+            <div class="pad" id="ocDoneBody"></div>
+          </div>
+        </div>
+
+        <!-- ────────── 空间扫描 ────────── -->
+        <div id="dtab-scan">
         <div class="card">
           <div class="ctrl">
             <span class="muted" style="font-size:13px">扫描目标</span>
@@ -489,10 +545,10 @@
             <div>选择扫描目标后点击「开始扫描」。扫描是只读操作，不会改动任何文件，也不需要管理员权限。</div>
           </div>
         </div>
-      </div>
+        </div>
 
-      <!-- 垃圾清理页 -->
-      <div class="page" id="page-clean">
+        <!-- ────────── 垃圾清理 ────────── -->
+        <div id="dtab-clean" class="hidden">
         <div class="card">
           <div class="ctrl">
             <span class="muted" style="font-size:13px">清理范围：系统盘上的临时文件与缓存</span>
@@ -546,16 +602,16 @@
               删除动作只发生在你勾选并点击「开始清理」之后，且直接删除不进回收站。</div>
           </div>
         </div>
-      </div>
+        </div>
 
-      <!-- 空间迁移页 -->
-      <div class="page" id="page-migrate">
+        <!-- ────────── 空间迁移 ────────── -->
+        <div id="dtab-migrate" class="hidden">
         <div class="banner">
-          <div class="t" style="color:var(--accent)">迁移原理：复制 → 校验 → 原位置换成目录联接</div>
+          <div class="t" style="color:var(--accent)">搬迁是怎么回事？三步，全程可后悔</div>
           <ul>
-            <li>数据被完整复制到目标盘并通过校验后，原位置才会替换为指向新位置的目录联接（Junction）——软件看到的路径不变，无需重新配置。</li>
-            <li>原数据先保留为「迁移备份」，<b style="color:var(--fg)">不会立即删除</b>。你验证软件一切正常后，在下方「迁移记录」里删除备份，空间才真正释放。</li>
-            <li>任何一步都可以整体撤销：恢复备份、还原链接与环境变量。</li>
+            <li><b style="color:var(--fg)">复制</b>：把大文件完整复制到其他盘，复制完自动核对无误。</li>
+            <li><b style="color:var(--fg)">调包</b>：在老位置留一个「传送门」，软件还从老路径读写，感觉不到任何变化。</li>
+            <li><b style="color:var(--fg)">后悔药</b>：原来的数据先不删（就是备份）。软件用几天没问题，再来这里点「删除备份」，C 盘空间才真正腾出来；期间随时可一键恢复原状。</li>
           </ul>
         </div>
 
@@ -576,8 +632,8 @@
 
         <div class="card hidden" id="mgListCard">
           <div class="card-head">
-            <span class="t">可迁移项</span>
-            <span class="d">低风险项默认勾选；标注「中风险」的需你自行确认影响</span>
+            <span class="t">可迁移地址</span>
+            <span class="d">按应用分组：工作地址 · 数据存储地址 · 缓存地址；低风险默认勾选</span>
             <span class="spacer"></span>
             <span class="badge b-link" id="mgSummary"></span>
           </div>
@@ -585,10 +641,20 @@
           <div class="card-foot">
             <span class="muted" style="font-size:13px">目标位置</span>
             <select id="mgDisk" style="max-width:220px"></select>
-            <input type="text" id="mgBase" placeholder="目标根目录" style="flex:1;min-width:220px">
+            <input type="text" id="mgBase" placeholder="目标根目录" style="flex:1;min-width:200px">
             <button id="mgPick">浏览…</button>
             <label class="chk" id="mgSetEnvWrap"><input type="checkbox" id="mgSetEnv" checked> 同时设置环境变量</label>
             <button class="primary" id="mgExec">开始迁移</button>
+          </div>
+          <div class="card-foot" style="border-top:1px solid var(--hairline)">
+            <span class="muted" style="font-size:12.5px">地址不在清单里？添加任意目录：</span>
+            <select id="mgCustomRole">
+              <option value="data">数据存储地址</option>
+              <option value="work">工作地址</option>
+              <option value="cache">缓存地址</option>
+            </select>
+            <button class="sm" id="mgAddPath">添加目录…</button>
+            <span class="hint">添加后可作为迁移项搬迁到其他盘（应用地址通用做法：原位置留目录联接）</span>
           </div>
         </div>
 
@@ -620,6 +686,7 @@
             <div>点击「检测可迁移项」。检测是<b style="color:var(--fg)">只读</b>的，只发现与统计常见缓存目录的大小。<br>
               npm / Yarn / pip / Maven / Gradle / Go / Android SDK 等都在扫描之列。</div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -928,11 +995,16 @@ const ICONS = {
 
 const PAGE_META = {
   chat: { icon: ICONS.chat, name: 'AI 助手', sub: '与大模型对话；未配置大模型时也可使用下方本地快捷功能' },
-  scan: { icon: ICONS.scan, name: '磁盘扫描', sub: '只读统计：看清每个盘的空间被什么占了' },
+  disk: { icon: ICONS.scan, name: '磁盘整理', sub: '空间扫描 · 垃圾清理 · 空间迁移' },
   deploy: { icon: ICONS.deploy, name: 'Java 打包部署', sub: '构建后端 war_exploded 与前端产物；工具链自动探测、输出目录可选' },
-  clean: { icon: ICONS.clean, name: '垃圾清理', sub: '按可清理性分级清理：L2 默认勾选，L1 需逐项确认' },
-  migrate: { icon: ICONS.migrate, name: '空间迁移', sub: '把缓存搬到其他盘，原位置留目录联接；可整体回滚' },
   settings: { icon: ICONS.settings, name: '设置', sub: '主页选择 · AI 接入 · 模块开关' },
+};
+// 磁盘整理页内各页签的副标题。
+const DISK_TAB_SUB = {
+  oneclick: '推荐大多数用户使用：自动检测并给出整理方案',
+  scan: '空间扫描：只读统计，看清每个盘的空间被什么占了',
+  clean: '垃圾清理：L2 可安全清理默认勾选，L1 需你逐项确认',
+  migrate: '空间迁移：按应用搬迁工作/数据/缓存地址，可整体回滚',
 };
 
 async function renderRail() {
@@ -1014,11 +1086,9 @@ async function openPage(id) {
   curPage = id;
 
   if (id === 'chat') await initChat();
-  if (id === 'scan') await initScan();
+  if (id === 'disk') await initDisk();
   if (id === 'deploy') await initDeploy();
   if (id === 'settings') await initSettings();
-  if (id === 'clean') await initClean();
-  if (id === 'migrate') await initMigrate();
 }
 
 /* ───────── 聊天页 ───────── */
@@ -1046,8 +1116,8 @@ async function initChat() {
   const chips = [
     { t: '🔍 扫描 C 盘', fn: () => quickScan('C') },
     { t: '📄 查看最大文件', fn: () => quickMax() },
-    { t: '🧹 垃圾清理', fn: () => openPage('clean') },
-    { t: '🗂️ 空间迁移', fn: () => openPage('migrate') },
+    { t: '🧹 垃圾清理', fn: async () => { await openPage('disk'); showDiskTab('clean'); } },
+    { t: '🗂️ 空间迁移', fn: async () => { await openPage('disk'); showDiskTab('migrate'); } },
   ];
   const box = el('chips');
   chips.forEach(c => {
@@ -1170,9 +1240,13 @@ function finishStream(data) {
 }
 
 /* 快捷功能：本地确定性入口 */
-async function quickScan(disk) {
-  await A().StartScan(disk, false);
-  await openPage('scan');
+async function quickScan(diskLetter) {
+  await openPage('disk');
+  showDiskTab('scan');
+  if (diskLetter) {
+    const sel = el('disk');
+    if ([...sel.options].some(o => o.value === diskLetter)) sel.value = diskLetter;
+  }
   startScanUI();
 }
 async function quickMax() {
@@ -1184,6 +1258,288 @@ async function quickMax() {
   const lines = (res.largest_files || []).slice(0, 5)
     .map(f => `· ${fmtBytes(f.on_disk)}  ${f.path}`).join('\n');
   sysMsg('当前最大的 5 个文件：\n' + lines);
+}
+
+/* ───────── 磁盘整理页（页签容器） ───────── */
+// 三个功能（扫描/清理/迁移）后端完全独立，这里只是同一页面内的页签壳。
+// 页签只负责切换可见性与副标题，各自的初始化仍由 initScan/initClean/initMigrate 完成。
+let diskReady = false;
+let diskCurTab = 'scan';
+
+async function initDisk() {
+  if (!diskReady) {
+    diskReady = true;
+    document.querySelectorAll('#page-disk .segment button[data-tab]').forEach(b =>
+      b.addEventListener('click', () => showDiskTab(b.dataset.tab)));
+    showDiskTab('oneclick');
+    initOneClick();
+  }
+  await initScan();
+  await initClean();
+  await initMigrate();
+  // 清理/迁移页签若上次已完成检测，恢复展示（后端有缓存，不发起新的测量）
+  const cp = await A().CleanProgress();
+  if (cp.done && !cp.running) await loadCleanItems();
+  const mp = await A().MigrateProgress();
+  if (mp.done && !mp.running) await loadMigrateItems();
+  await loadJournals();
+}
+
+function showDiskTab(tab) {
+  diskCurTab = tab;
+  document.querySelectorAll('#page-disk .segment button[data-tab]').forEach(b =>
+    b.classList.toggle('on', b.dataset.tab === tab));
+  ['oneclick', 'scan', 'clean', 'migrate'].forEach(t =>
+    el('dtab-' + t).classList.toggle('hidden', t !== tab));
+  el('pageSub').textContent = DISK_TAB_SUB[tab] || '';
+  el('diskTabHint').textContent = '';
+}
+
+/* ───────── 一键整理（傻瓜式向导） ─────────
+   流程：开始检测（跑清理+迁移两项检测）→ 大白话方案（能删多少/能搬多少/暂不动的）
+   → 一键执行 → 结果 + 「删备份再省一倍」的后续提示。
+   技术细节（L2/L1、Junction、journal）都翻译成生活语言，高级操作在各专项页签。 */
+let ocInited = false;
+
+function initOneClick() {
+  if (ocInited) return;
+  ocInited = true;
+  el('ocStart').addEventListener('click', ocDetect);
+  el('ocOnlyClean').addEventListener('click', () => ocExecute(false));
+  el('ocDoAll').addEventListener('click', () => ocExecute(true));
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// waitBackend 轮询直到 pred 为真（后端完成某个异步阶段）。
+async function waitBackend(pollFn, pred, interval) {
+  for (;;) {
+    let v;
+    try { v = await pollFn(); } catch (e) { await sleep(interval); continue; }
+    if (pred(v)) return v;
+    await sleep(interval);
+  }
+}
+
+async function ocDetect() {
+  el('ocIdle').classList.add('hidden');
+  el('ocPlan').classList.add('hidden');
+  el('ocDone').classList.add('hidden');
+  el('ocDetecting').classList.remove('hidden');
+
+  const setStep = (idx, total, name, done) => {
+    el('ocDetectList').innerHTML = steps.slice(0, total).map((s, i) =>
+      `<div class="listrow" style="padding:7px 2px">
+        <span class="badge ${i < idx || (i === idx && done) ? 'b-ok' : (i === idx ? 'b-link' : '')}">${i < idx || (i === idx && done) ? '✓' : (i === idx ? '…' : '—')}</span>
+        <span style="font-size:13px;color:var(--fg-2)">${esc(s.label)}</span>
+        ${i === idx && !done && s.cur ? `<span class="mono muted" style="font-size:11.5px;margin-left:8px">${esc(s.cur)}</span>` : ''}
+      </div>`).join('');
+  };
+  const steps = [
+    { key: 'clean', label: '找出可以放心删除的垃圾文件' },
+    { key: 'migrate', label: '找出可以搬到其他盘的大文件' },
+    { key: 'c', label: '查看 C 盘使用情况' },
+  ];
+  setStep(0, 3, '', false);
+
+  await A().CleanScan();
+  const cp = await waitBackend(() => A().CleanProgress(), p => !p.running, 250);
+  setStep(1, 3, '', false);
+
+  await A().MigrateScan();
+  const mp = await waitBackend(() => A().MigrateProgress(), p => !p.running, 250);
+  setStep(2, 3, '', false);
+
+  await loadCleanItems();
+  await loadMigrateItems();
+  let vols = [];
+  try { vols = await A().Volumes() || []; } catch (e) {}
+  ocVol = vols.find(v => v.is_system) || null;
+  setStep(3, 3, '', true);
+
+  await sleep(350);
+  el('ocDetecting').classList.add('hidden');
+  ocRenderPlan();
+}
+
+let ocVol = null;
+
+function ocPlanData() {
+  const safe = (cleanItems || []).filter(i => i.level === 'L2' && !i.blocked && i.reclaimable > 0);
+  const needPick = (cleanItems || []).filter(i => i.level === 'L1' && !i.blocked);
+  const movable = (migrateItems || []).filter(i => i.risk === 'low');
+  const hold = (migrateItems || []).filter(i => i.risk !== 'low');
+  return {
+    safe, needPick, movable, hold,
+    cleanBytes: safe.reduce((s, i) => s + i.reclaimable, 0),
+    moveBytes: movable.reduce((s, i) => s + i.size, 0),
+    holdBytes: hold.reduce((s, i) => s + i.size, 0),
+  };
+}
+
+function ocRenderPlan() {
+  const d = ocPlanData();
+  el('ocPlan').classList.remove('hidden');
+
+  el('ocCdrive').textContent = ocVol
+    ? `C 盘已用 ${(ocVol.used_bytes / ocVol.total_bytes * 100).toFixed(0)}%，剩余 ${fmtBytes(ocVol.free_bytes)}`
+    : '';
+
+  const sec = (title, bytes, color, rows, foot) => `
+    <div style="padding:12px 14px;border:1px solid var(--hairline);border-radius:10px;margin-bottom:10px;background:var(--surface-2)">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <b style="font-size:14px;color:${color}">${title}</b>
+        <span style="font-size:19px;font-weight:650">${fmtBytes(bytes)}</span>
+      </div>
+      ${rows.length ? `<div class="muted" style="font-size:12px;margin:4px 0 2px">${rows.map(esc).join('、')}</div>` : ''}
+      ${foot ? `<div class="muted" style="font-size:12px;margin-top:4px">${foot}</div>` : ''}
+    </div>`;
+
+  const topNames = (items, key) => items.sort((a, b) => (b[key] || 0) - (a[key] || 0))
+    .slice(0, 3).map(i => i.app ? `${i.app} ${i.name}` : i.name);
+
+  el('ocPlanBody').innerHTML =
+    sec('可以放心删的垃圾', d.cleanBytes, 'var(--ok)',
+      topNames(d.safe.slice(), 'reclaimable'),
+      '临时文件和各类缓存，删除不影响任何功能。') +
+    sec('建议搬到其他盘的大文件', d.moveBytes, 'var(--accent)',
+      topNames(d.movable.slice(), 'size'),
+      d.movable.length
+        ? `将搬到 ${esc(ocTargetBase() || '其他盘')}，软件照常使用，随时可撤销。`
+        : '') +
+    (d.hold.length
+      ? sec('先不动的（需要你先退出相关软件）', d.holdBytes, 'var(--warn)',
+          d.hold.map(i => (i.app ? i.app + ' ' : '') + i.name),
+          '这些涉及正在使用的软件或重要数据。想手动处理可切到「空间迁移」页签。')
+      : '') +
+    (d.needPick.length
+      ? `<div class="muted" style="font-size:12.5px">另有需要你逐个挑选的文件（如下载目录，共 ${fmtBytes(d.needPick.reduce((s, i) => s + i.size, 0))}），可在「垃圾清理」页签自行勾选。</div>`
+      : '');
+
+  el('ocOnlyClean').disabled = d.cleanBytes === 0;
+  el('ocDoAll').disabled = d.cleanBytes === 0 && d.moveBytes === 0;
+}
+
+// 一键搬迁的目标盘：非系统盘里剩余空间最大的一个。
+let ocTargetCache = '';
+function ocTargetBase() {
+  if (ocTargetCache) return ocTargetCache;
+  ocTargetCache = el('mgBase').value.trim();
+  return ocTargetCache;
+}
+
+async function ocPickTarget() {
+  const vols = await A().Volumes() || [];
+  const best = vols.filter(v => !v.is_system).sort((a, b) => b.free_bytes - a.free_bytes)[0];
+  if (best) ocTargetCache = best.root.replace(/\\+$/, '') + '\\winclean-migrated';
+  return ocTargetCache;
+}
+
+async function ocExecute(doMigrate) {
+  const d = ocPlanData();
+  const target = await ocPickTarget();
+  if (doMigrate && d.moveBytes > 0 && !target) {
+    toast('没有找到可用的其他磁盘，无法搬迁。可以先「只清理垃圾」', true);
+    return;
+  }
+
+  const total = d.cleanBytes + (doMigrate ? d.moveBytes : 0);
+  const ok = await confirmModal('确认整理',
+    `将为你：<br>· 清理垃圾约 <b>${fmtBytes(d.cleanBytes)}</b><br>` +
+    (doMigrate && d.moveBytes > 0
+      ? `· 搬迁 <b>${d.movable.length}</b> 个大文件目录共 <b>${fmtBytes(d.moveBytes)}</b> 到 <span class="mono">${esc(target)}</span>（软件照常使用，可撤销）<br>`
+      : '') +
+    `不会碰任何文档、聊天记录和系统文件。`, '开始整理');
+  if (!ok) return;
+
+  el('ocPlan').classList.add('hidden');
+  el('ocRunning').classList.remove('hidden');
+  el('ocRunBar').querySelector('i').style.width = '4%';
+  let freed = 0, moved = 0, movedNames = [];
+
+  // 第 1 步：清理垃圾
+  if (d.cleanBytes > 0) {
+    el('ocPhase').textContent = '第 1 步 / 共 2 步';
+    el('ocRunStat').textContent = '正在清理垃圾文件…';
+    const tryClean = async confirmLarge => {
+      await A().CleanExecute(d.safe.map(i => i.id), [], confirmLarge);
+      await waitBackend(() => A().CleanExecProgress(), p => !p.running, 250);
+      const rs = await A().CleanResults() || [];
+      return rs.reduce((s, r) => s + r.freed_bytes, 0);
+    };
+    try {
+      freed = await tryClean(false);
+    } catch (e) {
+      const msg = String(e);
+      if (msg.indexOf('NEED_CONFIRM:') >= 0) {
+        const go = await confirmModal('垃圾比较多', esc(msg.replace('NEED_CONFIRM:', '')), '确认清理');
+        if (go) { el('ocRunStat').textContent = '正在清理垃圾文件…'; freed = await tryClean(true); }
+      } else {
+        toast(msg, true);
+      }
+    }
+    el('ocRunBar').querySelector('i').style.width = '45%';
+  } else {
+    el('ocPhase').textContent = '第 1 步 / 共 2 步';
+    el('ocRunStat').textContent = '没有需要清理的垃圾，跳过';
+    el('ocRunBar').querySelector('i').style.width = '45%';
+  }
+
+  // 第 2 步：搬迁大文件
+  if (doMigrate && d.moveBytes > 0) {
+    el('ocPhase').textContent = '第 2 步 / 共 2 步';
+    el('ocRunStat').textContent = '正在搬迁大文件（大文件需要一些时间，期间请别打开相关软件）…';
+    const ids = d.movable.map(i => i.id);
+    try {
+      await A().MigrateExecute(ids, target, true, false);
+      let mp = await waitBackend(() => A().MigrateExecProgress(), p => !p.running, 250);
+      // 后端要求确认大体量搬迁：问一句，确认后继续
+      if (mp.error && mp.error.indexOf('超过 5 GB') >= 0) {
+        const go = await confirmModal('大文件搬迁确认', esc(mp.error), '继续搬迁');
+        if (go) {
+          el('ocRunStat').textContent = '正在搬迁大文件…';
+          await A().MigrateExecute(ids, target, true, true);
+          mp = await waitBackend(() => A().MigrateExecProgress(), p => !p.running, 250);
+        }
+      }
+      if (mp.error) toast(mp.error, true);
+      const rs = (await A().MigrateResults() || []).filter(r => r.ok && !r.skipped);
+      moved = rs.reduce((s, r) => s + r.bytes, 0);
+      movedNames = rs.map(r => {
+        const it = migrateItems.find(x => x.id === r.id);
+        return it ? (it.app && it.app !== '开发工具缓存' && it.app !== '自定义目录' ? it.app : it.name) : r.id;
+      });
+    } catch (e) {
+      toast(String(e), true);
+    }
+  }
+
+  el('ocRunBar').querySelector('i').style.width = '100%';
+  el('ocRunning').classList.add('hidden');
+  await ocShowDone(freed, moved, movedNames, target, doMigrate);
+}
+
+async function ocShowDone(freed, moved, movedNames, target, didMigrate) {
+  el('ocDone').classList.remove('hidden');
+  const lines = [];
+  if (freed > 0) lines.push(`<div class="listrow"><span class="badge b-ok">✓</span>
+    <div class="n"><b>已清理垃圾 ${fmtBytes(freed)}</b><div class="d">临时文件与缓存，立即生效</div></div></div>`);
+  if (moved > 0) lines.push(`<div class="listrow"><span class="badge b-ok">✓</span>
+    <div class="n"><b>已搬迁 ${fmtBytes(moved)}</b><div class="d">${esc(movedNames.join('、'))} → 已搬到 ${esc(target)}，软件照常使用</div></div></div>`);
+  if (freed === 0 && moved === 0) lines.push('<div class="muted">本次没有可执行的项目。</div>');
+  if (moved > 0) lines.push(`<div class="banner" style="margin:10px 0 0">
+    <div class="t" style="color:var(--ok)">下一步（可选，能再省 ${fmtBytes(moved)}）</div>
+    <ul><li>搬迁的数据在新位置和原位置各有一份（原位置那份就是「后悔药」）。</li>
+    <li>用几天确认一切正常后，到 <a href="#" id="ocGoJournals" style="color:var(--accent)">「空间迁移 → 迁移记录」</a> 点「删除备份」，C 盘空间才会真正腾出来。</li></ul></div>`);
+  el('ocDoneBody').innerHTML = lines.join('') +
+    '<div class="row" style="margin-top:12px"><button class="primary" id="ocAgain">再检测一次</button></div>';
+  const again = el('ocAgain');
+  if (again) again.addEventListener('click', () => {
+    el('ocDone').classList.add('hidden');
+    el('ocIdle').classList.remove('hidden');
+  });
+  const gj = el('ocGoJournals');
+  if (gj) gj.addEventListener('click', e => { e.preventDefault(); showDiskTab('migrate'); loadJournals(); });
 }
 
 /* ───────── 扫描页 ───────── */
@@ -2047,6 +2403,16 @@ async function initMigrate() {
     });
     el('mgExec').addEventListener('click', () => execMigrate(false));
     el('mgRefreshJ').addEventListener('click', loadJournals);
+    el('mgAddPath').addEventListener('click', async () => {
+      const d = await A().PickDirectory('选择要纳入迁移的目录', '');
+      if (!d) return;
+      try {
+        const it = await A().MigrateAddPath(d, el('mgCustomRole').value, '');
+        toast('已添加：' + it.name + (it.size ? '（' + fmtBytes(it.size) + '）' : ''));
+        if (!migrateItems.length) { await startMigrateScan(); return; }
+        await loadMigrateItems();
+      } catch (e) { toast(String(e), true); }
+    });
     try {
       const vols = await A().Volumes() || [];
       const nonSys = vols.filter(v => !v.is_system);
@@ -2111,30 +2477,57 @@ async function loadMigrateItems() {
   el('mgEmpty').classList.add('hidden');
   el('mgListCard').classList.remove('hidden');
 
+  // 按应用分组（保持后端顺序）：已知应用（带图标）/ 开发工具缓存 / 自定义目录
+  const groups = [];
+  const byApp = {};
+  migrateItems.forEach(it => {
+    const key = it.app || '其他';
+    if (!byApp[key]) { byApp[key] = { app: key, icon: it.app_icon || '📁', items: [] }; groups.push(byApp[key]); }
+    byApp[key].items.push(it);
+  });
+
+  const ROLE_CN = { work: '工作地址', data: '数据存储地址', cache: '缓存地址' };
+  const ROLE_CLS = { work: 'b-link', data: 'b-warn', cache: 'b-ok' };
   let total = 0;
-  el('mgList').innerHTML = '<table><thead><tr><th style="width:26px"></th><th>名称与路径</th><th class="num">大小</th><th>风险</th></tr></thead><tbody>' +
-    migrateItems.map(it => {
+
+  el('mgList').innerHTML = groups.map(g => {
+    const rows = g.items.map(it => {
       total += it.size;
       const risk = it.risk === 'low'
-        ? '<span class="badge b-ok">低</span>'
-        : '<span class="badge b-warn">中</span>';
+        ? '<span class="badge b-ok">低风险</span>'
+        : '<span class="badge b-warn">中风险</span>';
+      const role = it.role
+        ? `<span class="badge ${ROLE_CLS[it.role] || ''}">${ROLE_CN[it.role] || it.role}</span>` : '';
       const env = it.env_var
-        ? `<span class="badge b-link mono" title="当前值：${esc(it.env_now || '（未设置）')}">${esc(it.env_var)}</span>`
-        : '<span class="badge">Junction</span>';
+        ? `<span class="badge b-link mono" title="当前值：${esc(it.env_now || '（未设置）')}">${esc(it.env_var)}</span>` : '';
       const why = it.risk_why ? `<div class="d" style="color:var(--warn)">${esc(it.risk_why)}</div>` : '';
       const note = it.note ? `<div class="d">${esc(it.note)}</div>` : '';
-      return `<tr>
-        <td><input type="checkbox" data-mg="${esc(it.id)}" ${it.risk === 'low' ? 'checked' : ''}></td>
-        <td><b style="font-size:12.5px">${esc(it.name)}</b>
-          <div class="path">${esc(it.path)}</div>${why}${note}</td>
-        <td class="num">${fmtBytes(it.size)}</td>
-        <td>${risk} ${env}</td>
-      </tr>`;
-    }).join('') + '</tbody></table>';
+      const rm = it.custom
+        ? ` <button class="sm ghost" data-mgrm="${esc(it.id)}">移除</button>` : '';
+      return `<div class="listrow" style="border-bottom:1px solid var(--hairline);border-radius:0">
+        <input type="checkbox" data-mg="${esc(it.id)}" ${it.risk === 'low' ? 'checked' : ''}>
+        <div class="n">
+          <b style="font-size:13px">${role} ${esc(it.name)}</b> ${risk} ${env}${rm}
+          <div class="path">${esc(it.path)}</div>${why}${note}
+        </div>
+        <div style="text-align:right;flex:none">
+          <div style="font-weight:600" data-size="${it.size}">${fmtBytes(it.size)}</div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="padding:12px 14px 4px">
+      <b style="font-size:13.5px">${esc(g.icon)} ${esc(g.app)}</b>
+      <span class="muted" style="font-size:12px"> · ${g.items.length} 个地址</span></div>${rows}`;
+  }).join('');
 
   el('mgSummary').textContent = '可迁移合计 ' + fmtBytes(total);
   el('mgList').querySelectorAll('input[data-mg]').forEach(inp =>
     inp.addEventListener('change', updateMigrateSelNote));
+  el('mgList').querySelectorAll('button[data-mgrm]').forEach(b =>
+    b.addEventListener('click', async () => {
+      try { await A().MigrateRemoveCustom(b.dataset.mgrm); await loadMigrateItems(); }
+      catch (e) { toast(String(e), true); }
+    }));
   updateMigrateSelNote();
 }
 
@@ -2359,8 +2752,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   await renderRail();
 
   // 主页 = 配置指向的页面（后端已做回退解析）
-  let home = 'scan';
-  try { home = await A().HomePage() || 'scan'; } catch (e) {}
+  let home = 'disk';
+  try { home = await A().HomePage() || 'disk'; } catch (e) {}
   const ms = await A().BootMS().catch(() => 0);
   el('bootms').textContent = `启动 ${ms}ms`;
 

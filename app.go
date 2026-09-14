@@ -78,6 +78,7 @@ type App struct {
 	migMu      sync.Mutex
 	migBusy    bool
 	migCancel  context.CancelFunc
+	migCustomSeq int
 	migScanDone atomic.Bool
 	migScanErr  atomic.Value // string
 	migScanCur  atomic.Value // string
@@ -134,15 +135,16 @@ func registerModules() {
 
 	r.Register(modules.Module{
 		Meta: modules.Meta{
-			ID:             "scan",
-			Name:           "磁盘扫描",
-			Desc:           "看清每个盘的空间被什么占了，定位大目录与大文件",
+			ID:             "disk",
+			Name:           "磁盘整理",
+			Desc:           "空间扫描 · 垃圾清理 · 空间迁移，三合一",
 			Icon:           "🔍",
 			Status:         modules.StatusReady,
 			DefaultEnabled: true,
 		},
 		OpenFn: func() (modules.OpenResult, error) {
-			// 刻意不做任何文件系统遍历——那是用户点「开始扫描」才发生的事。
+			// 刻意不做任何文件系统遍历——测量/清理/迁移都发生在用户
+			// 在页签里显式点击对应按钮时。
 			if _, err := sys.EnumerateVolumes(); err != nil {
 				return modules.OpenResult{OK: false, Message: "枚举磁盘失败: " + err.Error()}, err
 			}
@@ -163,37 +165,6 @@ func registerModules() {
 		OpenFn: func() (modules.OpenResult, error) {
 			// 零成本初始化：不探测工具链、不读源码目录。
 			// 工具链探测由用户在页面上点「重新探测」时执行。
-			return modules.OpenResult{OK: true}, nil
-		},
-	})
-
-	r.Register(modules.Module{
-		Meta: modules.Meta{
-			ID:             "clean",
-			Name:           "垃圾清理",
-			Desc:           "按可清理性分级清理临时文件与缓存（L2 默认勾选，L1 需确认）",
-			Icon:           "🧹",
-			Status:         modules.StatusReady,
-			DefaultEnabled: true,
-		},
-		OpenFn: func() (modules.OpenResult, error) {
-			// 懒加载：进入页面只确认删除引擎可用，不做任何测量——
-			// 测量发生在用户点「检测可清理项」时。
-			return modules.OpenResult{OK: true}, nil
-		},
-	})
-
-	r.Register(modules.Module{
-		Meta: modules.Meta{
-			ID:             "migrate",
-			Name:           "空间迁移",
-			Desc:           "把缓存等庞然大物搬到其他盘，原位置留目录联接，可整体回滚",
-			Icon:           "🗂️",
-			Status:         modules.StatusReady,
-			DefaultEnabled: true,
-		},
-		OpenFn: func() (modules.OpenResult, error) {
-			// 同上：候选检测发生在用户显式触发时。
 			return modules.OpenResult{OK: true}, nil
 		},
 	})
@@ -362,13 +333,13 @@ func (a *App) resolveHome() string {
 
 	// 配置里的主页不可用（或从未设置）时的回退顺序：
 	//   AI 已配置 → 聊天页（它是这个形态下的主功能）
-	//   否则      → 磁盘扫描（工具形态的门面；绝不能拿一个
+	//   否则      → 磁盘整理（工具形态的门面；绝不能拿一个
 	//               「需要先配置才能用」的页面当启动首页）
 	if m, ok := byID["chat"]; ok && m.Enabled && a.aiSettings().Valid() {
 		return "chat"
 	}
-	if _, ok := byID["scan"]; ok && byID["scan"].Enabled {
-		return "scan"
+	if _, ok := byID["disk"]; ok && byID["disk"].Enabled {
+		return "disk"
 	}
 	return firstReady
 }
