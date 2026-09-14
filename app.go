@@ -115,6 +115,22 @@ func registerModules() {
 
 	r.Register(modules.Module{
 		Meta: modules.Meta{
+			ID:             "deploy",
+			Name:           "Java 打包部署",
+			Desc:           "一键构建后端 war_exploded 与前端 dist 产物，自动探测 Maven/JDK",
+			Icon:           "📦",
+			Status:         modules.StatusReady,
+			DefaultEnabled: true,
+		},
+		OpenFn: func() (modules.OpenResult, error) {
+			// 零成本初始化：不探测工具链、不读源码目录。
+			// 工具链探测由用户在页面上点「重新探测」时执行。
+			return modules.OpenResult{OK: true}, nil
+		},
+	})
+
+	r.Register(modules.Module{
+		Meta: modules.Meta{
 			ID:             "clean",
 			Name:           "垃圾清理",
 			Desc:           "按可清理性分级清理临时文件与缓存（L0–L3 分级判定）",
@@ -129,7 +145,7 @@ func registerModules() {
 			ID:             "migrate",
 			Name:           "空间迁移",
 			Desc:           "把缓存、运行时等庞然大物批量搬到其他盘（可回滚）",
-			Icon:           "📦",
+			Icon:           "🗂️",
 			Status:         modules.StatusPlanned,
 			DefaultEnabled: false,
 		},
@@ -349,6 +365,7 @@ func (a *App) RefreshConfig() error {
 	}
 	a.cfg.General = nc.General
 	a.cfg.AI = nc.AI
+	a.cfg.Deploy = nc.Deploy
 	a.cfg.Modules = nc.Modules
 	return nil
 }

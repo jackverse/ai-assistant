@@ -19,12 +19,35 @@ func TestRegistryListJSON(t *testing.T) {
 	b, _ := json.MarshalIndent(list, "", "  ")
 	t.Logf("模块数: %d\n%s", len(list), b)
 
-	if len(list) != 4 {
-		t.Fatalf("应注册 4 个模块，实际 %d", len(list))
-	}
+	// 断言必需模块存在，而不是硬编码总数——
+	// 否则每加一个功能入口都要改测试（本文件就被 deploy 模块撞过一次）
+	required := []string{"chat", "scan", "deploy", "clean", "migrate"}
+	byID := map[string]bool{}
 	for _, m := range list {
 		if m.Meta.ID == "" {
 			t.Errorf("存在空 ID 的模块: %+v", m.Meta)
+		}
+		byID[m.Meta.ID] = true
+	}
+	for _, id := range required {
+		if !byID[id] {
+			t.Errorf("缺少必需模块 %q（已注册: %v）", id, keysOf(byID))
+		}
+	}
+
+	// 默认启用状态：扫描/聊天/部署启用，未完成的模块默认关闭
+	enabled := map[string]bool{}
+	for _, m := range list {
+		enabled[m.Meta.ID] = m.Enabled
+	}
+	for _, id := range []string{"chat", "scan", "deploy"} {
+		if !enabled[id] {
+			t.Errorf("%s 应默认启用", id)
+		}
+	}
+	for _, id := range []string{"clean", "migrate"} {
+		if enabled[id] {
+			t.Errorf("%s 未实现，不应默认启用（用户要求：不用的功能不启动）", id)
 		}
 	}
 
@@ -40,4 +63,12 @@ func TestRegistryListJSON(t *testing.T) {
 	if got := app2.resolveHome(); got != "chat" {
 		t.Errorf("AI 已配置时主页应为 chat，实际 %s", got)
 	}
+}
+
+func keysOf(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

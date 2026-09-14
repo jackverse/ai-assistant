@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"winclean/internal/deploy"
 )
 
 // ModuleConfig 是单个模块的配置。
@@ -49,6 +51,7 @@ type AI struct {
 type Config struct {
 	General General                 `yaml:"general"`
 	AI      AI                      `yaml:"ai"`
+	Deploy  deploy.Config           `yaml:"deploy"`
 	Modules map[string]ModuleConfig `yaml:"modules"`
 }
 

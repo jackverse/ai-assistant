@@ -210,6 +210,84 @@
         </div></div>
       </div>
 
+      <!-- 部署打包页 -->
+      <div class="page" id="page-deploy">
+        <div class="card">
+          <div class="pad">
+            <b>工具链</b>
+            <span class="muted" style="font-size:12.5px">— 自动探测本机的 JDK 与 Maven，无需手填路径</span>
+            <div class="form" style="margin-top:10px">
+              <label>JDK</label>
+              <div class="row" style="gap:8px">
+                <select id="dpJDK" style="min-width:420px"></select>
+                <span class="muted mono" id="dpJDKInfo" style="font-size:11.5px"></span>
+              </div>
+              <label>Maven</label>
+              <div class="row" style="gap:8px">
+                <select id="dpMvn" style="min-width:420px"></select>
+                <span class="muted mono" id="dpMvnInfo" style="font-size:11.5px"></span>
+              </div>
+              <div class="wide row" style="margin-top:2px">
+                <button id="dpDetect">重新探测</button>
+                <span class="muted" id="dpDetectNote" style="font-size:12px"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="pad">
+            <b>目录</b>
+            <div class="form" style="margin-top:10px">
+              <label>代码根目录</label>
+              <div class="row" style="gap:8px">
+                <input type="text" id="dpBase" style="flex:1;min-width:320px" placeholder="例如 D:\code">
+                <button id="dpPickBase">选择…</button>
+              </div>
+              <label>产物输出目录</label>
+              <div class="row" style="gap:8px">
+                <input type="text" id="dpOut" style="flex:1;min-width:320px" placeholder="打包产物写到哪（可随时更换）">
+                <button id="dpPickOut">选择…</button>
+                <button id="dpOpenOut">打开</button>
+              </div>
+              <label>保留环境</label>
+              <div class="row" style="gap:8px">
+                <input type="text" id="dpKeepEnv" style="width:120px" placeholder="prod">
+                <span class="muted" style="font-size:12px">只保留 application-&lt;此值&gt;.yml，其余环境配置在打包产物中移除</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="pad">
+            <b>项目与模块</b>
+            <span class="muted" id="dpSummary" style="font-size:12.5px"></span>
+            <div class="row" style="margin:10px 0;gap:8px">
+              <select id="dpProject"></select>
+              <button id="dpAll">全选</button>
+              <button id="dpNone">全不选</button>
+              <span style="flex:1"></span>
+              <button id="dpImport">导入既有配置…</button>
+            </div>
+            <div id="dpModules" style="font-size:13px"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="pad">
+            <div class="row" style="gap:10px">
+              <button class="primary" id="dpStart">开始打包</button>
+              <button id="dpCancel" class="hidden">取消</button>
+              <span class="muted" id="dpPhase" style="font-size:12.5px"></span>
+            </div>
+            <div class="progress" id="dpBar" style="margin-top:10px"><i></i></div>
+          </div>
+          <div id="dpLogs" style="max-height:340px;overflow:auto;padding:10px 14px;border-top:1px solid var(--border);
+               font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.5"></div>
+        </div>
+      </div>
+
       <!-- 设置页 -->
       <div class="page" id="page-settings">
         <div class="banner warn hidden" id="setWarn"></div>
@@ -320,8 +398,9 @@ function toast(msg, warn) {
 const PAGE_META = {
   chat: { icon: '💬', name: 'AI 助手', sub: '与大模型对话；未配置大模型时也可使用下方本地快捷功能' },
   scan: { icon: '🔍', name: '磁盘扫描', sub: '只读统计：看清每个盘的空间被什么占了' },
+  deploy: { icon: '📦', name: 'Java 打包部署', sub: '构建后端 war_exploded 与前端产物；工具链自动探测、输出目录可选' },
   clean: { icon: '🧹', name: '垃圾清理', sub: '按可清理性分级判定（开发中）' },
-  migrate: { icon: '📦', name: '空间迁移', sub: '把庞然大物搬到其他盘（规划中）' },
+  migrate: { icon: '🗂️', name: '空间迁移', sub: '把庞然大物搬到其他盘（规划中）' },
   settings: { icon: '⚙️', name: '设置', sub: '主页选择 · AI 接入 · 模块开关' },
 };
 
@@ -404,6 +483,7 @@ async function openPage(id) {
 
   if (id === 'chat') await initChat();
   if (id === 'scan') await initScan();
+  if (id === 'deploy') await initDeploy();
   if (id === 'settings') await initSettings();
   if (id === 'clean' || id === 'migrate') {
     el('phTitle').textContent = PAGE_META[id].name + '（' + (id === 'clean' ? '开发中' : '规划中') + '）';
@@ -750,6 +830,226 @@ function render(res) {
       tr.classList.toggle('hidden', n !== '' && !(tr.dataset.p || '').toLowerCase().includes(n));
     });
   });
+}
+
+/* ───────── 部署打包页 ───────── */
+let deployReady = false;
+
+async function initDeploy() {
+  if (deployReady) {
+    await refreshDeploy();      // 再次进入时刷新配置与进度
+    return;
+  }
+  deployReady = true;
+
+  // 后端事件：阶段/进度与日志实时推送
+  R().EventsOn('pack:event', ev => {
+    if (ev.kind === 'state' || ev.kind === 'done') {
+      if (ev.phase) el('dpPhase').textContent = ev.phase +
+        (ev.project ? ` · ${ev.project}` : '') + (ev.module ? ` / ${ev.module}` : '');
+      if (typeof ev.percent === 'number') {
+        el('dpBar').querySelector('i').style.width = ev.percent + '%';
+      }
+      if (ev.line) dpLog(ev.line);
+    } else if (ev.kind === 'log') {
+      dpLog((ev.project ? `[${ev.project}` + (ev.module ? '/' + ev.module : '') + '] ' : '') + ev.line);
+    }
+  });
+  R().EventsOn('pack:finished', failed => {
+    el('dpStart').disabled = false;
+    el('dpCancel').classList.add('hidden');
+    dpLog(failed ? '❌ 打包结束（有失败模块）' : '✅ 打包结束');
+  });
+
+  el('dpDetect').addEventListener('click', () => runDetect(true));
+  el('dpPickBase').addEventListener('click', async () => {
+    const d = await A().PickDirectory('选择代码根目录', el('dpBase').value);
+    if (d) { el('dpBase').value = d; await saveDeploy(); }
+  });
+  el('dpPickOut').addEventListener('click', async () => {
+    const d = await A().PickDirectory('选择产物输出目录', el('dpOut').value);
+    if (d) { el('dpOut').value = d; await saveDeploy(); }
+  });
+  el('dpOpenOut').addEventListener('click', async () => {
+    try { await A().OpenDirectory(el('dpOut').value); } catch (e) { toast(String(e), true); }
+  });
+  el('dpImport').addEventListener('click', async () => {
+    try {
+      const p = await A().PickConfigFile('选择既有打包工具的 config.yaml');
+      if (!p) return;
+      const dto = await A().ImportDeployConfig(p);
+      toast('已导入：' + dto.summary);
+      await refreshDeploy();
+    } catch (e) { toast(String(e), true); }
+  });
+  el('dpAll').addEventListener('click', () => dpToggleAll(true));
+  el('dpNone').addEventListener('click', () => dpToggleAll(false));
+  el('dpProject').addEventListener('change', () => renderDeployModules());
+  el('dpStart').addEventListener('click', startPack);
+  el('dpCancel').addEventListener('click', () => A().CancelPack());
+
+  // 保留环境 / 目录等改动即时保存，避免"改了没生效"的困惑
+  ['dpBase', 'dpOut', 'dpKeepEnv'].forEach(id =>
+    el(id).addEventListener('change', saveDeploy));
+
+  await refreshDeploy();
+  await runDetect(false);
+}
+
+async function refreshDeploy() {
+  let dto;
+  try { dto = await A().GetDeploy(); } catch (e) { toast(String(e), true); return; }
+
+  const c = dto.config || {};
+  el('dpBase').value = c.base_path || '';
+  el('dpOut').value = c.output_dir || '';
+  el('dpKeepEnv').value = c.keep_env || 'prod';
+  el('dpSummary').textContent = '— ' + (dto.summary || '');
+
+  // 项目下拉
+  const projs = (c.projects || []);
+  const cur = el('dpProject').value;
+  el('dpProject').innerHTML = projs.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('')
+    || '<option value="">（无项目，请先导入配置）</option>';
+  if (cur && projs.some(p => p.name === cur)) el('dpProject').value = cur;
+  renderDeployModules();
+
+  // 恢复进度显示（切走再切回时不丢）
+  const st = await A().PackStatus();
+  if (st.logs && st.logs.length) {
+    el('dpLogs').textContent = st.logs.join('\n');
+    el('dpLogs').scrollTop = el('dpLogs').scrollHeight;
+  }
+  if (st.running) {
+    el('dpStart').disabled = true;
+    el('dpCancel').classList.remove('hidden');
+    el('dpPhase').textContent = st.phase + (st.project ? ` · ${st.project}` : '');
+    el('dpBar').querySelector('i').style.width = st.percent + '%';
+  }
+  if (st.outputs && st.outputs.length) {
+    dpLog('产物：\n' + st.outputs.join('\n'));
+  }
+}
+
+function renderDeployModules() {
+  const projName = el('dpProject').value;
+  A().GetDeploy().then(dto => {
+    const proj = (dto.config.projects || []).find(p => p.name === projName);
+    const mods = proj ? (proj.modules || []) : [];
+    el('dpModules').innerHTML = mods.length ? mods.map((m, i) => {
+      const type = m.type || 'backend';
+      const extra = type === 'frontend'
+        ? `script: <span class="mono">${esc(m.script || '（未配置）')}</span> → ${esc(m.source || 'dist')}`
+        : `mvn clean package → <span class="mono">${esc(m.name)}</span>_war_exploded`;
+      const warn = (type === 'frontend' && !m.script)
+        ? ' <span class="badge b-warn">缺 script，无法构建</span>' : '';
+      return `<label class="chk" style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border)">
+        <input type="checkbox" data-mod="${esc(m.name)}" checked style="margin-top:5px">
+        <span style="flex:1">
+          <b>${esc(m.name)}</b>
+          <span class="badge ${type === 'frontend' ? 'b-link' : 'b-sum'}">${esc(type)}</span>${warn}
+          <div class="muted" style="font-size:12px">${extra} · 产物 <span class="mono">${esc(m.output || m.name)}</span>.zip</div>
+        </span>
+      </label>`;
+    }).join('') : '<div class="muted">该项目下没有模块</div>';
+  });
+}
+
+function dpToggleAll(on) {
+  el('dpModules').querySelectorAll('input[data-mod]').forEach(i => i.checked = on);
+}
+
+async function saveDeploy() {
+  try {
+    const dto = await A().GetDeploy();
+    const cfg = dto.config;
+    cfg.base_path = el('dpBase').value.trim();
+    cfg.output_dir = el('dpOut').value.trim();
+    cfg.keep_env = el('dpKeepEnv').value.trim() || 'prod';
+    // 工具链下拉里的值与配置同步（空串 = 用自动探测结果）
+    cfg.jdk_path = dpSelected('dpJDK');
+    cfg.maven_path = dpSelected('dpMvn');
+    await A().SaveDeploy(cfg);
+  } catch (e) { toast('保存配置失败: ' + e, true); }
+}
+
+function dpSelected(selId) {
+  const sel = el(selId);
+  if (!sel || sel.selectedIndex < 0) return '';
+  return sel.selectedOptions[0].dataset.path || '';
+}
+
+async function runDetect(notify) {
+  const noteEl = el('dpDetectNote');
+  if (notify) noteEl.textContent = '探测中…';
+  let res;
+  try {
+    const roots = [el('dpBase').value.trim()].filter(Boolean);
+    res = await A().DetectToolchain(roots);
+  } catch (e) {
+    noteEl.textContent = '探测失败: ' + e;
+    return;
+  }
+
+  const fill = (selId, list, infoId, kind) => {
+    const sel = el(selId);
+    const prev = dpSelected(selId);
+    sel.innerHTML = '<option value="" data-path="">（自动选择最优）</option>' + (list || []).map((t, i) => {
+      const label = `${t.version || '版本未知'} — ${t.path}${t.valid ? '' : '  ✗ ' + (t.detail || '不可用')}`
+        + `   [${t.source}]`;
+      return `<option data-path="${esc(t.valid ? t.path : '')}" ${i === 0 && t.valid ? 'selected' : ''}>${esc(label)}</option>`;
+    }).join('');
+    if (prev) sel.value = prev;
+    const info = el(infoId);
+    info.textContent = (list && list.length) ? `共 ${list.length} 个候选` : '（未探测到）';
+  };
+  fill('dpJDK', res.jdks, 'dpJDKInfo', 'jdk');
+  fill('dpMvn', res.mavens, 'dpMvnInfo', 'maven');
+
+  const notes = (res.notes || []).slice();
+  noteEl.textContent = `JDK ${ (res.jdks||[]).length } 个 / Maven ${ (res.mavens||[]).length } 个候选`
+    + (notes.length ? '；' + notes.join('；') : '');
+  if (!res.jdks || !res.jdks.length) {
+    noteEl.innerHTML += ' <span style="color:var(--danger)">未找到 JDK：请安装 JDK，或在下方输出目录上方手动填写路径</span>';
+  }
+  if (notify) toast('探测完成');
+}
+
+async function startPack() {
+  const proj = el('dpProject').value;
+  const mods = Array.from(el('dpModules').querySelectorAll('input[data-mod]'))
+    .filter(i => i.checked).map(i => i.dataset.mod);
+  const out = el('dpOut').value.trim();
+
+  if (!proj) { toast('请先导入或配置项目', true); return; }
+  if (!mods.length) { toast('请至少选择一个模块', true); return; }
+  if (!out) { toast('请先选择产物输出目录', true); return; }
+
+  await saveDeploy();   // 先落盘，保证打包用的就是界面上的配置
+
+  el('dpLogs').textContent = '';
+  el('dpStart').disabled = true;
+  el('dpCancel').classList.remove('hidden');
+  el('dpBar').querySelector('i').style.width = '0%';
+  dpLog(`开始打包 ${proj}：${mods.join(', ')}`);
+  dpLog(`输出目录：${out}`);
+
+  try {
+    await A().StartPack(proj, mods, out);
+  } catch (e) {
+    toast(String(e), true);
+    el('dpStart').disabled = false;
+    el('dpCancel').classList.add('hidden');
+  }
+}
+
+function dpLog(line) {
+  const box = el('dpLogs');
+  if (!box) return;
+  box.textContent += (box.textContent ? '\n' : '') + line;
+  // 自动滚到底，但用户手动上翻查看历史时不要抢
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  if (nearBottom) box.scrollTop = box.scrollHeight;
 }
 
 /* ───────── 设置页 ───────── */
