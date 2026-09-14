@@ -1,0 +1,19 @@
+# 统一换行符处理，避免 Windows 上出现大量 CRLF 警告
+* text=auto eol=lf
+
+# Windows 专用脚本保持 CRLF（如后续添加 .cmd/.bat/.ps1）
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制
+*.exe binary
+*.dll binary
+*.vhdx binary
+*.vhd binary
+*.png binary
+*.jpg binary
+*.ico binary
+
+# 避免 diff 噪音
+*.md text eol=lf
