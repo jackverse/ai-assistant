@@ -177,6 +177,20 @@ func IsUnder(child, parent string) bool {
 	return strings.HasPrefix(c, p+`\`)
 }
 
+// RelPath 返回 child 相对 parent 的子路径（child 必须在 parent 之下）。
+// 仅用于同一遍历过程内由拼接产生的路径，大小写保证一致。
+func RelPath(parent, child string) (string, error) {
+	p := strings.TrimRight(parent, `\`)
+	c := strings.TrimRight(child, `\`)
+	if c == p {
+		return "", nil
+	}
+	if !strings.HasPrefix(c, p+`\`) {
+		return "", fmt.Errorf("路径 %s 不在 %s 之下", child, parent)
+	}
+	return c[len(p)+1:], nil
+}
+
 // JoinPath 是 filepath.Join 的包装，额外保证结果通过 CleanAbsolute。
 func JoinPath(base, elem string) (string, error) {
 	return CleanAbsolute(filepath.Join(base, elem))

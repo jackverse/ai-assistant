@@ -491,7 +491,139 @@
         </div>
       </div>
 
-      <!-- 占位页（清理/迁移等未完成模块） -->
+      <!-- 垃圾清理页 -->
+      <div class="page" id="page-clean">
+        <div class="card">
+          <div class="ctrl">
+            <span class="muted" style="font-size:13px">清理范围：系统盘上的临时文件与缓存</span>
+            <button class="primary" id="clRescan">检测可清理项</button>
+            <button id="clCancel" class="hidden">取消</button>
+            <span class="spacer" style="flex:1"></span>
+            <span id="clStatus" class="muted" style="font-size:12.5px"></span>
+          </div>
+          <div class="pad hidden" id="clProgWrap" style="padding-top:0">
+            <div class="progress indeterminate" id="clBar"><i></i></div>
+            <div class="pline"><span id="clStat"></span><span class="cur mono" id="clCur"></span></div>
+          </div>
+        </div>
+        <div id="clBanners" style="margin-top:14px"></div>
+
+        <div class="card hidden" id="clListCard">
+          <div class="card-head">
+            <span class="t">可清理项</span>
+            <span class="d">默认只勾选「可安全清理」；黄色项需你逐项确认，勾选权完全在你</span>
+            <span class="spacer"></span>
+            <span class="badge b-ok" id="clSummary"></span>
+          </div>
+          <div class="bodybox" id="clList"></div>
+          <div class="card-foot">
+            <label class="chk"><input type="checkbox" id="clConfirm">
+              <span>我了解将删除的内容<span class="muted">（大体量清理时必选）</span></span></label>
+            <span class="spacer" style="flex:1"></span>
+            <span class="hint" id="clSelNote"></span>
+            <button class="primary" id="clExec">开始清理</button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="clExecCard">
+          <div class="card-head"><span class="t">正在清理</span><span class="spacer"></span><span class="hint" id="clExecName"></span></div>
+          <div class="pad">
+            <div class="progress indeterminate" id="clExecBar"><i></i></div>
+            <div class="pline"><span id="clExecStat"></span></div>
+          </div>
+        </div>
+
+        <div class="card hidden" id="clResultCard">
+          <div class="card-head"><span class="t">清理结果</span>
+            <span class="d">直接删除不进回收站；被占用/近期修改的文件已自动跳过</span></div>
+          <div class="bodybox" id="clResults"></div>
+        </div>
+
+        <div class="card" id="clEmpty">
+          <div class="empty">
+            <div class="big">还没有检测</div>
+            <div>点击「检测可清理项」。检测是<b style="color:var(--fg)">只读</b>的：只统计哪些临时文件与缓存可以安全删除，不会改动任何内容。<br>
+              删除动作只发生在你勾选并点击「开始清理」之后，且直接删除不进回收站。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 空间迁移页 -->
+      <div class="page" id="page-migrate">
+        <div class="banner">
+          <div class="t" style="color:var(--accent)">迁移原理：复制 → 校验 → 原位置换成目录联接</div>
+          <ul>
+            <li>数据被完整复制到目标盘并通过校验后，原位置才会替换为指向新位置的目录联接（Junction）——软件看到的路径不变，无需重新配置。</li>
+            <li>原数据先保留为「迁移备份」，<b style="color:var(--fg)">不会立即删除</b>。你验证软件一切正常后，在下方「迁移记录」里删除备份，空间才真正释放。</li>
+            <li>任何一步都可以整体撤销：恢复备份、还原链接与环境变量。</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="ctrl">
+            <span class="muted" style="font-size:13px">扫描范围：常见开发工具缓存与大目录</span>
+            <button class="primary" id="mgRescan">检测可迁移项</button>
+            <button id="mgCancel" class="hidden">取消</button>
+            <span class="spacer" style="flex:1"></span>
+            <span id="mgStatus" class="muted" style="font-size:12.5px"></span>
+          </div>
+          <div class="pad hidden" id="mgProgWrap" style="padding-top:0">
+            <div class="progress indeterminate" id="mgBar"><i></i></div>
+            <div class="pline"><span id="mgStat"></span><span class="cur mono" id="mgCur"></span></div>
+          </div>
+        </div>
+        <div id="mgBanners" style="margin-top:14px"></div>
+
+        <div class="card hidden" id="mgListCard">
+          <div class="card-head">
+            <span class="t">可迁移项</span>
+            <span class="d">低风险项默认勾选；标注「中风险」的需你自行确认影响</span>
+            <span class="spacer"></span>
+            <span class="badge b-link" id="mgSummary"></span>
+          </div>
+          <div class="bodybox" id="mgList"></div>
+          <div class="card-foot">
+            <span class="muted" style="font-size:13px">目标位置</span>
+            <select id="mgDisk" style="max-width:220px"></select>
+            <input type="text" id="mgBase" placeholder="目标根目录" style="flex:1;min-width:220px">
+            <button id="mgPick">浏览…</button>
+            <label class="chk" id="mgSetEnvWrap"><input type="checkbox" id="mgSetEnv" checked> 同时设置环境变量</label>
+            <button class="primary" id="mgExec">开始迁移</button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="mgExecCard">
+          <div class="card-head"><span class="t">正在迁移</span><span class="spacer"></span><span class="hint" id="mgPhase"></span></div>
+          <div class="pad">
+            <div class="progress" id="mgExecBar"><i></i></div>
+            <div class="pline"><span id="mgExecStat"></span><span class="cur mono" id="mgExecCur"></span></div>
+          </div>
+        </div>
+
+        <div class="card hidden" id="mgResultCard">
+          <div class="card-head"><span class="t">迁移结果</span>
+            <span class="d">原数据保留为「迁移备份」，验证无误后在迁移记录中删除</span></div>
+          <div class="bodybox" id="mgResults"></div>
+        </div>
+
+        <div class="card hidden" id="mgJournalCard">
+          <div class="card-head"><span class="t">迁移记录</span>
+            <span class="d">撤销 = 恢复原状；删除备份 = 释放 C 盘空间（不可再回滚）</span>
+            <span class="spacer"></span>
+            <button class="sm ghost" id="mgRefreshJ">刷新</button></div>
+          <div class="bodybox" id="mgJournals"></div>
+        </div>
+
+        <div class="card" id="mgEmpty">
+          <div class="empty">
+            <div class="big">还没有检测</div>
+            <div>点击「检测可迁移项」。检测是<b style="color:var(--fg)">只读</b>的，只发现与统计常见缓存目录的大小。<br>
+              npm / Yarn / pip / Maven / Gradle / Go / Android SDK 等都在扫描之列。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 占位页（未完成模块） -->
       <div class="page" id="page-placeholder">
         <div class="card"><div class="empty">
           <div class="big" id="phTitle"></div>
@@ -722,7 +854,7 @@
 
     </div>
     <footer>
-      <span id="footnote">本工具当前只读：不删除、不迁移、不修改系统设置。无后台服务、无开机自启，关闭窗口即完全退出。</span>
+      <span id="footnote">删除与迁移仅在你显式确认后执行；清理默认只动可安全重建的缓存。无后台服务、无开机自启，关闭窗口即完全退出。</span>
       <span><button id="btnExport" class="hidden">导出 HTML 报告</button></span>
     </footer>
   </div>
@@ -798,8 +930,8 @@ const PAGE_META = {
   chat: { icon: ICONS.chat, name: 'AI 助手', sub: '与大模型对话；未配置大模型时也可使用下方本地快捷功能' },
   scan: { icon: ICONS.scan, name: '磁盘扫描', sub: '只读统计：看清每个盘的空间被什么占了' },
   deploy: { icon: ICONS.deploy, name: 'Java 打包部署', sub: '构建后端 war_exploded 与前端产物；工具链自动探测、输出目录可选' },
-  clean: { icon: ICONS.clean, name: '垃圾清理', sub: '按可清理性分级判定（开发中）' },
-  migrate: { icon: ICONS.migrate, name: '空间迁移', sub: '把庞然大物搬到其他盘（规划中）' },
+  clean: { icon: ICONS.clean, name: '垃圾清理', sub: '按可清理性分级清理：L2 默认勾选，L1 需逐项确认' },
+  migrate: { icon: ICONS.migrate, name: '空间迁移', sub: '把缓存搬到其他盘，原位置留目录联接；可整体回滚' },
   settings: { icon: ICONS.settings, name: '设置', sub: '主页选择 · AI 接入 · 模块开关' },
 };
 
@@ -885,11 +1017,8 @@ async function openPage(id) {
   if (id === 'scan') await initScan();
   if (id === 'deploy') await initDeploy();
   if (id === 'settings') await initSettings();
-  if (id === 'clean' || id === 'migrate') {
-    el('phTitle').textContent = PAGE_META[id].name + '（' + (id === 'clean' ? '开发中' : '规划中') + '）';
-    el('phDesc').textContent = '该模块已在架构中注册，但功能尚未实现。你可以在「设置 → 功能模块」里把它停用，' +
-      '这样它连导航都不会出现；等版本发布后再打开。';
-  }
+  if (id === 'clean') await initClean();
+  if (id === 'migrate') await initMigrate();
 }
 
 /* ───────── 聊天页 ───────── */
@@ -917,7 +1046,8 @@ async function initChat() {
   const chips = [
     { t: '🔍 扫描 C 盘', fn: () => quickScan('C') },
     { t: '📄 查看最大文件', fn: () => quickMax() },
-    { t: '🧹 垃圾清理（开发中）', fn: () => sysMsg('垃圾清理模块还在开发中。设计见 docs/design/06-可清理性分级.md。') },
+    { t: '🧹 垃圾清理', fn: () => openPage('clean') },
+    { t: '🗂️ 空间迁移', fn: () => openPage('migrate') },
   ];
   const box = el('chips');
   chips.forEach(c => {
@@ -1647,6 +1777,502 @@ function dpLog(line) {
   if (nearBottom) box.scrollTop = box.scrollHeight;
 }
 
+/* ───────── 通用确认弹窗 ───────── */
+// Wails 生产构建里 confirm() 不可靠，做一个基于 DOM 的模态。
+function confirmModal(title, bodyHtml, okText) {
+  return new Promise(resolve => {
+    const mask = document.createElement('div');
+    mask.style.cssText = 'position:fixed;inset:0;z-index:98;background:rgba(0,0,0,.55);display:grid;place-items:center';
+    mask.innerHTML = `<div class="card" style="max-width:520px;width:92%">
+      <div class="card-head"><span class="t">${esc(title)}</span></div>
+      <div class="pad" style="font-size:13px;color:var(--fg-2)">${bodyHtml}</div>
+      <div class="card-foot" style="justify-content:flex-end">
+        <button class="ghost" data-r="0">取消</button>
+        <button class="primary" data-r="1">${esc(okText || '确认')}</button>
+      </div></div>`;
+    mask.querySelectorAll('button[data-r]').forEach(b =>
+      b.addEventListener('click', () => { mask.remove(); resolve(b.dataset.r === '1'); }));
+    document.body.appendChild(mask);
+  });
+}
+
+/* ───────── 垃圾清理页 ───────── */
+let cleanReady = false;
+let cleanItems = [];        // 后端 CleanItems() 结果
+let cleanPoll = null;
+let cleanDownloadSel = {};  // downloadFiles 勾选：path -> bool
+
+async function initClean() {
+  if (!cleanReady) {
+    cleanReady = true;
+    el('clRescan').addEventListener('click', startCleanScan);
+    el('clCancel').addEventListener('click', () => A().CancelClean());
+    el('clExec').addEventListener('click', execClean);
+    el('clConfirm').addEventListener('change', updateCleanSelNote);
+  }
+  // 页面重进时若上次检测已完成，直接展示（后端有缓存）
+  const p = await A().CleanProgress();
+  if (p.done && !p.running) await loadCleanItems();
+}
+
+function startCleanScan() {
+  el('clRescan').disabled = true;
+  el('clCancel').classList.remove('hidden');
+  el('clProgWrap').classList.remove('hidden');
+  el('clListCard').classList.add('hidden');
+  el('clResultCard').classList.add('hidden');
+  el('clExecCard').classList.add('hidden');
+  el('clEmpty').classList.add('hidden');
+  el('clBanners').innerHTML = '';
+  el('clStatus').textContent = '';
+  A().CleanScan().catch(e => toast(String(e), true));
+  if (cleanPoll) clearInterval(cleanPoll);
+  cleanPoll = setInterval(cleanPollTick, 250);
+}
+
+async function cleanPollTick() {
+  let p;
+  try { p = await A().CleanProgress(); } catch (e) { return; }
+  el('clStat').textContent = p.running
+    ? `已检测 ${p.count} 项…` : (p.error ? '检测失败' : `检测完成，共 ${p.count} 项`);
+  el('clCur').textContent = p.current || '';
+  if (!p.running) {
+    clearInterval(cleanPoll); cleanPoll = null;
+    el('clRescan').disabled = false;
+    el('clCancel').classList.add('hidden');
+    el('clProgWrap').classList.add('hidden');
+    if (p.error) banner('clBanners', '检测出现问题', [p.error]);
+    await loadCleanItems();
+  }
+}
+
+async function loadCleanItems() {
+  cleanItems = await A().CleanItems() || [];
+  cleanDownloadSel = {};
+  if (!cleanItems.length) {
+    el('clEmpty').classList.remove('hidden');
+    el('clListCard').classList.add('hidden');
+    return;
+  }
+  el('clEmpty').classList.add('hidden');
+  el('clListCard').classList.remove('hidden');
+
+  let totalReclaim = 0;
+  const L2 = '<span class="badge b-ok">L2 可安全清理</span>';
+  const L1 = '<span class="badge b-warn">L1 需确认</span>';
+  el('clList').innerHTML = cleanItems.map(it => {
+    const blocked = !!it.blocked;
+    const defCheck = it.level === 'L2' && !blocked;
+    totalReclaim += it.reclaimable;
+    const stats = [];
+    if (it.recent_files) stats.push(`<span class="badge">跳过近期 ${fmtCount(it.recent_files)} 个（${fmtBytes(it.recent_bytes)}）</span>`);
+    if (it.in_use_files) stats.push(`<span class="badge">被占用 ${fmtCount(it.in_use_files)} 个（${fmtBytes(it.in_use_bytes)}）</span>`);
+    if (it.min_age_hours >= 1) stats.push(`<span class="badge">仅处理 ${Math.round(it.min_age_hours)} 小时前的文件</span>`);
+    if (it.admin_required) stats.push('<span class="badge b-warn">需管理员</span>');
+
+    const tip = `${esc(it.reason)}\n后果：${esc(it.consequence)}` + (it.note ? `\n${esc(it.note)}` : '');
+
+    let row = `<div class="listrow" style="border-bottom:1px solid var(--hairline);border-radius:0">
+      <input type="checkbox" data-cl="${esc(it.id)}" ${defCheck ? 'checked' : ''} ${blocked ? 'disabled' : ''}>
+      <div class="n">
+        <b>${esc(it.title)}</b> ${it.level === 'L2' ? L2 : L1}
+        ${blocked ? `<span class="badge b-danger">${esc(it.blocked)}</span>` : ''}
+        <div class="d mono" title="${tip}">${esc(it.reason)}</div>
+        <div class="d">${stats.join(' ')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:600">${fmtBytes(it.reclaimable)}</div>
+        <div class="muted" style="font-size:11.5px">共 ${fmtBytes(it.size)}</div>
+      </div>
+    </div>`;
+
+    if (it.kind === 'downloads' && (it.download_files || []).length && !blocked) {
+      const rows = it.download_files.map(f => {
+        cleanDownloadSel[f.path] = false;
+        const sugg = f.suggested
+          ? ' <span class="badge b-warn">建议删除</span>'
+          : (f.is_dir ? ' <span class="badge">目录</span>' : '');
+        return `<tr>
+          <td style="width:26px"><input type="checkbox" data-cld="${esc(f.path)}" data-size="${f.size}"></td>
+          <td class="num">${fmtBytes(f.size)}</td>
+          <td class="num">${f.age_days < 0 ? '—' : f.age_days + ' 天'}</td>
+          <td class="path">${esc(f.name)}${sugg}</td>
+        </tr>`;
+      }).join('');
+      row += `<div style="padding:0 14px 12px 40px">
+        <table><thead><tr><th></th><th class="num">大小</th><th class="num">年龄</th><th>文件</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`;
+    }
+    return row;
+  }).join('');
+
+  el('clSummary').textContent = '可回收合计 ' + fmtBytes(totalReclaim);
+  el('clList').querySelectorAll('input[data-cl]').forEach(inp =>
+    inp.addEventListener('change', updateCleanSelNote));
+  el('clList').querySelectorAll('input[data-cld]').forEach(inp =>
+    inp.addEventListener('change', () => {
+      cleanDownloadSel[inp.dataset.cld] = inp.checked;
+      updateCleanSelNote();
+    }));
+  updateCleanSelNote();
+}
+
+function cleanSelection() {
+  const ids = [];
+  let bytes = 0, files = 0, needConfirm = false;
+  el('clList').querySelectorAll('input[data-cl]').forEach(inp => {
+    if (!inp.checked) return;
+    const it = cleanItems.find(x => x.id === inp.dataset.cl);
+    if (!it) return;
+    if (it.kind === 'downloads') {
+      const picked = [];
+      el('clList').querySelectorAll(`input[data-cld]`).forEach(f => {
+        if (f.checked) {
+          picked.push(f.dataset.cld);
+          bytes += Number(f.dataset.size || 0);
+          files++;
+        }
+      });
+      if (picked.length) ids.push({ id: it.id, files: picked });
+      return;
+    }
+    ids.push({ id: it.id, files: null });
+    bytes += it.reclaimable;
+    files += it.reclaimable_files;
+    if (it.reclaimable > 5 * 1024 ** 3 || it.reclaimable_files > 10000) needConfirm = true;
+  });
+  return { ids, bytes, files, needConfirm };
+}
+
+let cleanSelectionCache = { ids: [], bytes: 0, files: 0, needConfirm: false };
+function updateCleanSelNote() {
+  cleanSelectionCache = cleanSelection();
+  const s = cleanSelectionCache;
+  el('clSelNote').textContent = s.ids.length
+    ? `已选 ${s.ids.length} 项 · 约 ${fmtBytes(s.bytes)} / ${fmtCount(s.files)} 个文件` : '';
+  el('clExec').disabled = s.ids.length === 0;
+  if (s.bytes > 5 * 1024 ** 3) {
+    el('clConfirm').parentElement.style.color = 'var(--warn)';
+  } else {
+    el('clConfirm').parentElement.style.color = '';
+  }
+}
+
+async function execClean() {
+  const s = cleanSelectionCache;
+  if (!s.ids.length) return;
+  if ((s.needConfirm || s.bytes > 5 * 1024 ** 3) && !el('clConfirm').checked) {
+    toast('大体量清理需要先勾选「我了解将删除的内容」', true);
+    return;
+  }
+  const ok = await confirmModal('确认清理',
+    `即将直接删除（<b style="color:var(--danger)">不进回收站</b>）约 <b>${fmtBytes(s.bytes)}</b> / ${fmtCount(s.files)} 个文件。<br>
+     被占用的文件会自动跳过；此操作<b style="color:var(--danger)">不可撤销</b>。`, '开始清理');
+  if (!ok) return;
+
+  const ids = s.ids.map(x => x.id);
+  const files = [];
+  s.ids.forEach(x => { if (x.files) files.push(...x.files); });
+
+  el('clListCard').classList.add('hidden');
+  el('clExecCard').classList.remove('hidden');
+  el('clExecBar').classList.add('indeterminate');
+  el('clExecStat').textContent = '准备中…';
+  el('clExecName').textContent = '';
+
+  try {
+    await A().CleanExecute(ids, files, el('clConfirm').checked);
+  } catch (e) {
+    el('clExecCard').classList.add('hidden');
+    el('clListCard').classList.remove('hidden');
+    toast(String(e).replace('NEED_CONFIRM:', ''), true);
+    return;
+  }
+  if (cleanPoll) clearInterval(cleanPoll);
+  cleanPoll = setInterval(cleanExecPoll, 250);
+}
+
+async function cleanExecPoll() {
+  let p;
+  try { p = await A().CleanExecProgress(); } catch (e) { return; }
+  el('clExecStat').textContent = p.running
+    ? `已删除 ${fmtBytes(p.freed_bytes)} · ${fmtCount(p.deleted_files)} 个文件`
+    : (p.error ? p.error : `清理完成：释放 ${fmtBytes(p.freed_bytes)} · 删除 ${fmtCount(p.deleted_files)} 个文件`);
+  el('clExecName').textContent = p.current_name || '';
+  if (!p.running) {
+    clearInterval(cleanPoll); cleanPoll = null;
+    el('clExecCard').classList.add('hidden');
+    await showCleanResults();
+  }
+}
+
+async function showCleanResults() {
+  const results = await A().CleanResults() || [];
+  if (!results.length) return;
+  el('clResultCard').classList.remove('hidden');
+  let total = 0;
+  el('clResults').innerHTML = '<table><thead><tr><th>候选</th><th class="num">释放</th><th class="num">删除文件</th>' +
+    '<th class="num">跳过（占用）</th><th class="num">跳过（近期）</th><th class="num">错误</th></tr></thead><tbody>' +
+    results.map(r => {
+      total += r.freed_bytes;
+      const it = cleanItems.find(x => x.id === r.id);
+      return `<tr>
+        <td>${esc(it ? it.title : r.id)}</td>
+        <td class="num">${fmtBytes(r.freed_bytes)}</td>
+        <td class="num">${fmtCount(r.deleted_files)}</td>
+        <td class="num">${fmtCount(r.skipped_in_use)}</td>
+        <td class="num">${fmtCount(r.skipped_recent)}</td>
+        <td class="num" ${r.errors ? 'style="color:var(--warn)"' : ''}>${fmtCount(r.errors)}</td>
+      </tr>` + (r.samples && r.samples.length
+        ? `<tr><td colspan="6" class="path" style="color:var(--fg-4)">${r.samples.map(esc).join('<br>')}</td></tr>` : '');
+    }).join('') + '</tbody></table>' +
+    `<div class="pad" style="padding-top:10px"><b>合计释放 ${fmtBytes(total)}</b></div>`;
+}
+
+/* ───────── 空间迁移页 ───────── */
+let migrateReady = false;
+let migrateItems = [];
+let migratePoll = null;
+let migrateExecPollT = null;
+const PHASE_CN = { precheck: '预检', copy: '复制', verify: '校验', switch: '切换（改名+建链接）', validate: '验证生效', done: '完成' };
+
+async function initMigrate() {
+  if (!migrateReady) {
+    migrateReady = true;
+    el('mgRescan').addEventListener('click', startMigrateScan);
+    el('mgCancel').addEventListener('click', () => A().CancelMigrate());
+    el('mgPick').addEventListener('click', async () => {
+      const d = await A().PickDirectory('选择迁移目标根目录', el('mgBase').value);
+      if (d) el('mgBase').value = d;
+    });
+    el('mgExec').addEventListener('click', () => execMigrate(false));
+    el('mgRefreshJ').addEventListener('click', loadJournals);
+    try {
+      const vols = await A().Volumes() || [];
+      const nonSys = vols.filter(v => !v.is_system);
+      el('mgDisk').innerHTML = nonSys.length
+        ? nonSys.map(v => `<option value="${esc(v.root)}" data-ntfs="${v.is_ntfs ? 1 : 0}" data-free="${v.free_bytes}">
+            ${esc(v.letter)}: ${esc(v.label || '')}（剩余 ${fmtBytes(v.free_bytes)}${v.is_ntfs ? '' : '，非 NTFS 不可用'}）</option>`).join('')
+        : '<option value="">（未找到其他内置磁盘）</option>';
+      el('mgDisk').addEventListener('change', updateMigrateBase);
+      updateMigrateBase();
+    } catch (e) { console.warn(e); }
+  }
+  const p = await A().MigrateProgress();
+  if (p.done && !p.running) await loadMigrateItems();
+  await loadJournals();
+}
+
+function updateMigrateBase() {
+  const opt = el('mgDisk').selectedOptions[0];
+  if (!opt || !opt.value) return;
+  const base = opt.value.replace(/\\+$/, '') + '\\winclean-migrated';
+  if (!el('mgBase').value || el('mgBase').dataset.auto === '1') {
+    el('mgBase').value = base;
+    el('mgBase').dataset.auto = '1';
+  }
+}
+
+function startMigrateScan() {
+  el('mgRescan').disabled = true;
+  el('mgCancel').classList.remove('hidden');
+  el('mgProgWrap').classList.remove('hidden');
+  el('mgListCard').classList.add('hidden');
+  el('mgResultCard').classList.add('hidden');
+  el('mgEmpty').classList.add('hidden');
+  el('mgBanners').innerHTML = '';
+  A().MigrateScan().catch(e => toast(String(e), true));
+  if (migratePoll) clearInterval(migratePoll);
+  migratePoll = setInterval(migratePollTick, 250);
+}
+
+async function migratePollTick() {
+  let p;
+  try { p = await A().MigrateProgress(); } catch (e) { return; }
+  el('mgStat').textContent = p.running ? `已检测 ${p.count} 项…` : (p.error ? '检测失败' : `检测完成，共 ${p.count} 项`);
+  el('mgCur').textContent = p.current || '';
+  if (!p.running) {
+    clearInterval(migratePoll); migratePoll = null;
+    el('mgRescan').disabled = false;
+    el('mgCancel').classList.add('hidden');
+    el('mgProgWrap').classList.add('hidden');
+    if (p.error) banner('mgBanners', '检测出现问题', [p.error]);
+    await loadMigrateItems();
+  }
+}
+
+async function loadMigrateItems() {
+  migrateItems = await A().MigrateItems() || [];
+  if (!migrateItems.length) {
+    el('mgEmpty').classList.remove('hidden');
+    el('mgListCard').classList.add('hidden');
+    return;
+  }
+  el('mgEmpty').classList.add('hidden');
+  el('mgListCard').classList.remove('hidden');
+
+  let total = 0;
+  el('mgList').innerHTML = '<table><thead><tr><th style="width:26px"></th><th>名称与路径</th><th class="num">大小</th><th>风险</th></tr></thead><tbody>' +
+    migrateItems.map(it => {
+      total += it.size;
+      const risk = it.risk === 'low'
+        ? '<span class="badge b-ok">低</span>'
+        : '<span class="badge b-warn">中</span>';
+      const env = it.env_var
+        ? `<span class="badge b-link mono" title="当前值：${esc(it.env_now || '（未设置）')}">${esc(it.env_var)}</span>`
+        : '<span class="badge">Junction</span>';
+      const why = it.risk_why ? `<div class="d" style="color:var(--warn)">${esc(it.risk_why)}</div>` : '';
+      const note = it.note ? `<div class="d">${esc(it.note)}</div>` : '';
+      return `<tr>
+        <td><input type="checkbox" data-mg="${esc(it.id)}" ${it.risk === 'low' ? 'checked' : ''}></td>
+        <td><b style="font-size:12.5px">${esc(it.name)}</b>
+          <div class="path">${esc(it.path)}</div>${why}${note}</td>
+        <td class="num">${fmtBytes(it.size)}</td>
+        <td>${risk} ${env}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+
+  el('mgSummary').textContent = '可迁移合计 ' + fmtBytes(total);
+  el('mgList').querySelectorAll('input[data-mg]').forEach(inp =>
+    inp.addEventListener('change', updateMigrateSelNote));
+  updateMigrateSelNote();
+}
+
+function migrateSelection() {
+  const ids = [];
+  let bytes = 0;
+  el('mgList').querySelectorAll('input[data-mg]').forEach(inp => {
+    if (!inp.checked) return;
+    const it = migrateItems.find(x => x.id === inp.dataset.mg);
+    if (it) { ids.push(it.id); bytes += it.size; }
+  });
+  return { ids, bytes };
+}
+
+function updateMigrateSelNote() { migrateSelectionCache = migrateSelection(); }
+let migrateSelectionCache = { ids: [], bytes: 0 };
+
+async function execMigrate(confirmLarge) {
+  const s = migrateSelectionCache;
+  if (!s.ids.length) { toast('请先勾选要迁移的项目', true); return; }
+  const base = el('mgBase').value.trim();
+  if (!base) { toast('请选择目标位置', true); return; }
+
+  if (!confirmLarge && s.bytes > 5 * 1024 ** 3) {
+    const ok = await confirmModal('确认大体量迁移',
+      `本次迁移约 <b>${fmtBytes(s.bytes)}</b>。迁移期间请勿使用相关软件（npm/Maven 等），<br>
+       数据会先复制后切换，源盘需保留足够空间。`, '继续迁移');
+    if (!ok) return;
+  }
+
+  el('mgListCard').classList.add('hidden');
+  el('mgExecCard').classList.remove('hidden');
+  el('mgExecBar').querySelector('i').style.width = '0%';
+  el('mgExecStat').textContent = '预检中…';
+  el('mgExecCur').textContent = '';
+
+  try {
+    await A().MigrateExecute(s.ids, base, el('mgSetEnv').checked, confirmLarge);
+  } catch (e) {
+    el('mgExecCard').classList.add('hidden');
+    el('mgListCard').classList.remove('hidden');
+    toast(String(e), true);
+    return;
+  }
+  if (migrateExecPollT) clearInterval(migrateExecPollT);
+  migrateExecPollT = setInterval(migrateExecPoll, 250);
+}
+
+async function migrateExecPoll() {
+  let p;
+  try { p = await A().MigrateExecProgress(); } catch (e) { return; }
+  el('mgPhase').textContent = (p.item_name ? p.item_name + ' · ' : '') + (PHASE_CN[p.phase] || p.phase || '');
+  const pct = p.phase === 'copy' ? Math.min(95, (p.copied_bytes / (migrateSelectionCache.bytes || 1)) * 100)
+    : (p.phase === 'done' ? 100 : (p.phase ? 96 : 2));
+  el('mgExecBar').querySelector('i').style.width = pct.toFixed(1) + '%';
+  el('mgExecStat').textContent = `已复制 ${fmtBytes(p.copied_bytes)} · ${fmtCount(p.copied_files)} 个文件`;
+  el('mgExecCur').textContent = p.current_file || '';
+
+  if (!p.running) {
+    clearInterval(migrateExecPollT); migrateExecPollT = null;
+    el('mgExecCard').classList.add('hidden');
+    if (p.error && p.error.indexOf('超过 5 GB') >= 0) {
+      // 后端要求确认大体量迁移：弹窗后带确认标记重试
+      const ok = await confirmModal('需要确认', esc(p.error), '确认并继续');
+      if (ok) { await execMigrate(true); return; }
+    } else if (p.error) {
+      toast(p.error, true);
+    }
+    await showMigrateResults();
+    await loadJournals();
+  }
+}
+
+async function showMigrateResults() {
+  const results = await A().MigrateResults() || [];
+  const real = results.filter(r => r.id !== '__confirm__');
+  if (!real.length) return;
+  el('mgResultCard').classList.remove('hidden');
+  el('mgResults').innerHTML = '<table><thead><tr><th>状态</th><th>项目</th><th class="num">数据量</th><th>目标位置</th></tr></thead><tbody>' +
+    real.map(r => {
+      const it = migrateItems.find(x => x.id === r.id);
+      const st = r.ok
+        ? (r.skipped ? '<span class="badge">已迁移过，跳过</span>' : '<span class="badge b-ok">成功</span>')
+        : `<span class="badge b-danger">失败</span>`;
+      const env = r.env_set ? ' <span class="badge b-link">已设环境变量</span>' : '';
+      return `<tr>
+        <td>${st}${env}</td>
+        <td><b style="font-size:12.5px">${esc(it ? it.name : r.id)}</b>
+          ${r.error ? `<div class="d" style="color:var(--danger)">${esc(r.error)}</div>` : ''}
+          ${r.ok && !r.skipped ? `<div class="d">备份：${esc(r.backup)}<br>验证软件正常后，在「迁移记录」里删除备份以释放空间</div>` : ''}</td>
+        <td class="num">${fmtBytes(r.bytes)}</td>
+        <td class="path">${esc(r.target || '—')}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+async function loadJournals() {
+  let js;
+  try { js = await A().MigrateJournals() || []; } catch (e) { return; }
+  el('mgJournalCard').classList.toggle('hidden', js.length === 0);
+  el('mgJournals').innerHTML = js.map(j => {
+    const items = (j.items || []).map(it => {
+      const st = it.undone ? '<span class="badge">已撤销</span>'
+        : it.purged ? '<span class="badge b-sum">备份已删除</span>'
+        : '<span class="badge b-ok">生效中</span>';
+      const env = it.env_var ? `<span class="badge mono">${esc(it.env_var)}</span>` : '';
+      return `<div class="listrow">
+        <div class="n"><b style="font-size:12.5px">${esc(it.id)}</b> ${st} ${env}
+          <div class="path">${esc(it.source)} → ${esc(it.target)}</div>
+          ${it.purged || it.undone ? '' : `<div class="d">备份：${esc(it.backup)}</div>`}</div>
+        ${it.undone || it.purged ? '' : `
+          <button class="sm ghost" data-undo="${esc(j.id)}">撤销（恢复原状）</button>
+          <button class="sm" data-purge="${esc(j.id)}">删除备份（释放空间）</button>`}
+      </div>`;
+    }).join('');
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--hairline)">
+      <div class="muted mono" style="font-size:11.5px;margin-bottom:6px">${esc(j.id)} · ${j.time ? new Date(j.time).toLocaleString() : ''}</div>
+      ${items}</div>`;
+  }).join('');
+
+  el('mgJournals').querySelectorAll('button[data-undo]').forEach(b =>
+    b.addEventListener('click', async () => {
+      const ok = await confirmModal('撤销迁移',
+        '将摘除目录联接、把备份改回原位、恢复环境变量。<br>软件会立即回到迁移前的状态。', '撤销');
+      if (!ok) return;
+      try { await A().MigrateUndo(b.dataset.undo); toast('已撤销，恢复到迁移前状态'); await loadJournals(); }
+      catch (e) { toast(String(e), true); }
+    }));
+  el('mgJournals').querySelectorAll('button[data-purge]').forEach(b =>
+    b.addEventListener('click', async () => {
+      const ok = await confirmModal('删除迁移备份',
+        '<b style="color:var(--danger)">删除后无法再回滚到迁移前状态</b>（数据只保留在新位置）。<br>请先确认相关软件已正常工作。', '确认删除备份');
+      if (!ok) return;
+      try { await A().MigratePurgeBackup(b.dataset.purge); toast('备份已删除，空间已释放'); await loadJournals(); }
+      catch (e) { toast(String(e), true); }
+    }));
+}
+
 /* ───────── 设置页 ───────── */
 async function initSettings() {
   const s = await A().GetSettings();
@@ -1740,7 +2366,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   await openPage(home);
   el('footnote').textContent =
-    '本工具当前只读：不删除、不迁移、不修改系统设置。单进程轻入口，无后台服务、无开机自启，关闭窗口即完全退出。';
+    '删除与迁移仅在你显式确认后执行；清理默认只动可安全重建的缓存。单进程轻入口，无后台服务、无开机自启，关闭窗口即完全退出。';
 });
 </script>
 </body>

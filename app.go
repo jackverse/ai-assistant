@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"winclean/internal/ai"
+	"winclean/internal/clean"
 	"winclean/internal/cli"
 	"winclean/internal/config"
 	"winclean/internal/deploy"
+	"winclean/internal/migrate"
 	"winclean/internal/model"
 	"winclean/internal/modules"
 	"winclean/internal/report"
@@ -54,6 +56,41 @@ type App struct {
 	chatBusy   atomic.Bool
 
 	bootWarnings []string
+
+	// ── 垃圾清理模块状态（clean_api.go）──
+	cleanMu      sync.Mutex
+	cleanBusy    bool
+	cleanCancel  context.CancelFunc
+	cleanScanDone atomic.Bool
+	cleanScanErr  atomic.Value // string
+	cleanScanCur  atomic.Value // string
+	cleanScanCount atomic.Int64
+	cleanExecDone  atomic.Bool
+	cleanExecErr   atomic.Value // string
+	cleanExecName  atomic.Value // string
+	cleanExecFreed atomic.Int64
+	cleanExecFiles atomic.Int64
+	cleanItems   []clean.Candidate
+	cleanStats   map[string]clean.Stats
+	cleanResults []clean.Result
+
+	// ── 空间迁移模块状态（migrate_api.go）──
+	migMu      sync.Mutex
+	migBusy    bool
+	migCancel  context.CancelFunc
+	migScanDone atomic.Bool
+	migScanErr  atomic.Value // string
+	migScanCur  atomic.Value // string
+	migScanCount atomic.Int64
+	migExecDone atomic.Bool
+	migExecErr  atomic.Value // string
+	migPhase    atomic.Value // string
+	migItemName atomic.Value // string
+	migCopiedBytes  atomic.Int64
+	migCopiedFiles  atomic.Int64
+	migCurFile      atomic.Value // string
+	migCands    []migrate.Cand
+	migResults  []migrate.ItemResult
 }
 
 // NewApp 创建应用对象并注册全部功能模块。
@@ -134,10 +171,15 @@ func registerModules() {
 		Meta: modules.Meta{
 			ID:             "clean",
 			Name:           "垃圾清理",
-			Desc:           "按可清理性分级清理临时文件与缓存（L0–L3 分级判定）",
+			Desc:           "按可清理性分级清理临时文件与缓存（L2 默认勾选，L1 需确认）",
 			Icon:           "🧹",
-			Status:         modules.StatusDevelopment,
-			DefaultEnabled: false, // ← 不用的模块默认不启用、不启动
+			Status:         modules.StatusReady,
+			DefaultEnabled: true,
+		},
+		OpenFn: func() (modules.OpenResult, error) {
+			// 懒加载：进入页面只确认删除引擎可用，不做任何测量——
+			// 测量发生在用户点「检测可清理项」时。
+			return modules.OpenResult{OK: true}, nil
 		},
 	})
 
@@ -145,10 +187,14 @@ func registerModules() {
 		Meta: modules.Meta{
 			ID:             "migrate",
 			Name:           "空间迁移",
-			Desc:           "把缓存、运行时等庞然大物批量搬到其他盘（可回滚）",
+			Desc:           "把缓存等庞然大物搬到其他盘，原位置留目录联接，可整体回滚",
 			Icon:           "🗂️",
-			Status:         modules.StatusPlanned,
-			DefaultEnabled: false,
+			Status:         modules.StatusReady,
+			DefaultEnabled: true,
+		},
+		OpenFn: func() (modules.OpenResult, error) {
+			// 同上：候选检测发生在用户显式触发时。
+			return modules.OpenResult{OK: true}, nil
 		},
 	})
 }

@@ -35,19 +35,16 @@ func TestRegistryListJSON(t *testing.T) {
 		}
 	}
 
-	// 默认启用状态：扫描/聊天/部署启用，未完成的模块默认关闭
+	// 默认启用状态：全部功能模块默认启用。
+	// clean/migrate 曾因「未实现」默认关闭；现已实现并上线，
+	// 反转断言防止将来有人无意把它们改回禁用。
 	enabled := map[string]bool{}
 	for _, m := range list {
 		enabled[m.Meta.ID] = m.Enabled
 	}
-	for _, id := range []string{"chat", "scan", "deploy"} {
+	for _, id := range []string{"chat", "scan", "deploy", "clean", "migrate"} {
 		if !enabled[id] {
 			t.Errorf("%s 应默认启用", id)
-		}
-	}
-	for _, id := range []string{"clean", "migrate"} {
-		if enabled[id] {
-			t.Errorf("%s 未实现，不应默认启用（用户要求：不用的功能不启动）", id)
 		}
 	}
 
