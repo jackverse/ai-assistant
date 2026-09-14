@@ -1,0 +1,13 @@
+# 构建产物
+/bin/
+winclean.exe
+
+# 扫描结果（含用户目录结构，属隐私数据，不应提交）
+scan-*.json
+winclean-scan.json
+*.tmp
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
