@@ -9,6 +9,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+
+	"winclean/internal/config"
 )
 
 // 前端资源随二进制内嵌，因此最终产物仍是单个 exe。
@@ -20,11 +22,19 @@ var assets embed.FS
 
 // runGUI 启动图形界面。
 //
-// 界面主题与前端 CSS 的暗色变量保持一致，避免启动瞬间白屏闪烁。
+// 轻启动原则：这里只做「读配置 + 建模块注册表」两件事，
+// 任何模块的后端（包括磁盘枚举、环境自检）都不初始化——
+// 它们发生在用户真正进入对应模块页面时。
 func runGUI() {
-	app := NewApp()
+	cfg, warns, err := config.Load()
+	if err != nil {
+		cfg = config.Default()
+	}
 
-	err := wails.Run(&options.App{
+	app := NewApp(cfg)
+	app.SetBootWarnings(warns)
+
+	err = wails.Run(&options.App{
 		Title:     "Windows 助手",
 		Width:     1160,
 		Height:    800,

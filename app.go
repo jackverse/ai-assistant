@@ -5,26 +5,39 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"winclean/internal/ai"
 	"winclean/internal/cli"
+	"winclean/internal/config"
 	"winclean/internal/model"
+	"winclean/internal/modules"
 	"winclean/internal/report"
 	"winclean/internal/scan"
 	"winclean/internal/sys"
+	"winclean/internal/version"
 	"winclean/internal/winapi"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// procStart 用于度量「界面就绪耗时」，向用户证明入口足够轻。
+var procStart = time.Now()
+
 // App 是暴露给前端的后端对象。
 //
-// 设计原则：前端只通过这里的少量方法交互，所有真正的逻辑都在
-// internal/* 里——GUI 只是同一套引擎的另一个入口，与 CLI 完全等价。
+// 架构约定（14 号设计文档）：主功能 1 个 + 扩展功能 N 个。
+// App 自身只持有入口必需的状态（配置、模块注册表、当前扫描/对话会话）；
+// 任何模块的后端资源都在用户进入该模块页面时才创建。
+// AI 模块在未配置时不会产生任何网络活动。
 type App struct {
 	ctx context.Context
+
+	cfg *config.Config
+	reg *modules.Registry
 
 	mu      sync.Mutex
 	cancel  context.CancelFunc
@@ -32,17 +45,363 @@ type App struct {
 	result  *model.ScanResult
 	running atomic.Bool
 	done    atomic.Bool
-	lastErr atomic.Value // string
+	lastErr atomic.Value
 	started time.Time
+
+	chatMu     sync.Mutex
+	chatCancel context.CancelFunc
+	chatBusy   atomic.Bool
+
+	bootWarnings []string
 }
 
-// NewApp 创建应用对象。
-func NewApp() *App {
-	return &App{prog: scan.NewProgress()}
+// NewApp 创建应用对象并注册全部功能模块。
+//
+// 新增扩展页的方式：在这里 Register 一个 Module，再在前端加对应页面。
+// 入口的启动成本不随模块数量增长——注册只是往 map 放一条元数据。
+func NewApp(cfg *config.Config) *App {
+	a := &App{cfg: cfg, prog: scan.NewProgress()}
+	a.reg = modules.New(cfg.IsEnabled)
+	appRef = a
+
+	registerModules()
+	return a
 }
 
-// startup 由 Wails 在窗口就绪后调用，保存上下文供事件推送使用。
-func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+// appRef 单窗口应用的引用（模块 OpenFn 需要读取配置等 App 资源时使用）。
+var appRef *App
+
+// registerModules 声明功能模块。
+//
+// 主/副的区分不在注册表——聊天与扫描在架构上完全平等，
+// 「谁是主页」由 config.general.home 指向谁决定。
+func registerModules() {
+	r := appRef.reg
+
+	r.Register(modules.Module{
+		Meta: modules.Meta{
+			ID:             "chat",
+			Name:           "AI 助手",
+			Desc:           "与大模型对话，由它给出各功能的快捷入口",
+			Icon:           "💬",
+			Status:         modules.StatusReady,
+			DefaultEnabled: true,
+		},
+		OpenFn: func() (modules.OpenResult, error) {
+			// 聊天模块的「初始化」是零成本的：不建连接、不探测网络、不校验配置。
+			// 配置检查在聊天页展示时进行；只有用户真正发送消息才会发起 HTTP 请求。
+			return modules.OpenResult{OK: true}, nil
+		},
+	})
+
+	r.Register(modules.Module{
+		Meta: modules.Meta{
+			ID:             "scan",
+			Name:           "磁盘扫描",
+			Desc:           "看清每个盘的空间被什么占了，定位大目录与大文件",
+			Icon:           "🔍",
+			Status:         modules.StatusReady,
+			DefaultEnabled: true,
+		},
+		OpenFn: func() (modules.OpenResult, error) {
+			// 刻意不做任何文件系统遍历——那是用户点「开始扫描」才发生的事。
+			if _, err := sys.EnumerateVolumes(); err != nil {
+				return modules.OpenResult{OK: false, Message: "枚举磁盘失败: " + err.Error()}, err
+			}
+			return modules.OpenResult{OK: true,
+				Message: "扫描引擎就绪（仅读取磁盘清单与环境信息，未扫描任何文件）"}, nil
+		},
+	})
+
+	r.Register(modules.Module{
+		Meta: modules.Meta{
+			ID:             "clean",
+			Name:           "垃圾清理",
+			Desc:           "按可清理性分级清理临时文件与缓存（L0–L3 分级判定）",
+			Icon:           "🧹",
+			Status:         modules.StatusDevelopment,
+			DefaultEnabled: false, // ← 不用的模块默认不启用、不启动
+		},
+	})
+
+	r.Register(modules.Module{
+		Meta: modules.Meta{
+			ID:             "migrate",
+			Name:           "空间迁移",
+			Desc:           "把缓存、运行时等庞然大物批量搬到其他盘（可回滚）",
+			Icon:           "📦",
+			Status:         modules.StatusPlanned,
+			DefaultEnabled: false,
+		},
+	})
+}
+
+// startup 由 Wails 在窗口就绪后调用。
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+}
+
+// SetBootWarnings 记录启动阶段的非致命问题（如配置损坏已回退默认）。
+func (a *App) SetBootWarnings(w []string) { a.bootWarnings = w }
+
+// BootWarnings 返回启动阶段的问题。
+func (a *App) BootWarnings() []string { return a.bootWarnings }
+
+// BootMS 返回从进程启动到界面就绪的毫秒数。
+//
+// 暴露这个数字是刻意的：用户要求「不拖慢启动」，那就把启动耗时摆在明面上，
+// 以后任何功能进来如果拖慢了它，立刻能被发现。
+func (a *App) BootMS() int64 { return time.Since(procStart).Milliseconds() }
+
+// ───────── 主页解析与设置 ─────────
+
+// SettingsDTO 是设置页需要的全部信息。
+type SettingsDTO struct {
+	Home       string             `json:"home"`
+	Pages      []HomePageOption   `json:"pages"`
+	AI         AISettingsDTO      `json:"ai"`
+	ConfigPath string             `json:"config_path"`
+	Modules    []modules.ModuleView `json:"modules"`
+}
+
+type HomePageOption struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Current bool   `json:"current"`
+	Enabled bool   `json:"enabled"`
+}
+
+type AISettingsDTO struct {
+	Configured bool   `json:"configured"`
+	Provider   string `json:"provider"`
+	BaseURL    string `json:"base_url"`
+	Model      string `json:"model"`
+	HasAPIKey  bool   `json:"has_api_key"`
+}
+
+// GetSettings 返回设置页数据。
+func (a *App) GetSettings() SettingsDTO {
+	s := SettingsDTO{ConfigPath: a.ConfigPath()}
+
+	// 主页候选：所有已启用模块
+	for _, m := range a.reg.List() {
+		if !m.Enabled {
+			continue
+		}
+		s.Pages = append(s.Pages, HomePageOption{
+			ID: m.Meta.ID, Name: m.Meta.Name + " " + m.Meta.Icon,
+			Current: false, Enabled: true,
+		})
+	}
+
+	home := a.resolveHome()
+	s.Home = home
+	for i := range s.Pages {
+		s.Pages[i].Current = s.Pages[i].ID == home
+	}
+
+	c := a.cfg.AI
+	s.AI = AISettingsDTO{
+		Provider:  c.Provider,
+		BaseURL:   c.BaseURL,
+		Model:     c.Model,
+		HasAPIKey: c.APIKey != "",
+	}
+	s.AI.Configured = ai.Settings{BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model}.Valid()
+
+	s.Modules = a.reg.List()
+	return s
+}
+
+// resolveHome 解析启动主页，配置指向不可用页面时回退到第一个可用页。
+//
+// 回退必须在后端做：前端如果只拿到一个不存在的 id，就只能渲染空白。
+func (a *App) resolveHome() string {
+	want := a.cfg.General.Home
+
+	list := a.reg.List()
+	byID := map[string]modules.ModuleView{}
+	var firstReady string
+	for _, m := range list {
+		byID[m.Meta.ID] = m
+		if firstReady == "" && m.Enabled && m.Meta.Status == modules.StatusReady {
+			firstReady = m.Meta.ID
+		}
+	}
+
+	if m, ok := byID[want]; ok && m.Enabled {
+		return want
+	}
+
+	// 配置里的主页不可用：挑一个合理的默认（AI 已配置优先聊天，否则扫描）
+	if m, ok := byID["chat"]; ok && m.Enabled && a.aiSettings().Valid() {
+		return "chat"
+	}
+	if firstReady != "" {
+		return firstReady
+	}
+	return "scan"
+}
+
+// HomePage 返回启动时应显示的页面 id。
+func (a *App) HomePage() string { return a.resolveHome() }
+
+// SetHome 设置启动主页并持久化。
+func (a *App) SetHome(id string) error {
+	found := false
+	for _, m := range a.reg.List() {
+		if m.Meta.ID == id && m.Enabled {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("不能把主页设为 %s：该页面不存在或已被禁用", id)
+	}
+	a.cfg.General.Home = id
+	return a.cfg.Save()
+}
+
+// SetModuleEnabled 开/关某个模块并写入配置文件。
+//
+// 这就是「需要用清理的时候把清理打开」的落地：
+// 开关即配置，配置即持久化，重启后依然生效。
+// 关闭的是当前主页时，主页自动回退（下次启动按 resolveHome 生效）。
+func (a *App) SetModuleEnabled(id string, enabled bool) (modules.ModuleView, error) {
+	if !a.reg.SetEnabled(id, enabled) {
+		return modules.ModuleView{}, fmt.Errorf("未知模块: %s", id)
+	}
+	a.cfg.SetEnabled(id, enabled)
+	if err := a.cfg.Save(); err != nil {
+		return modules.ModuleView{}, fmt.Errorf("写入配置失败: %w", err)
+	}
+	for _, m := range a.reg.List() {
+		if m.Meta.ID == id {
+			return m, nil
+		}
+	}
+	return modules.ModuleView{}, nil
+}
+
+// ConfigPath 返回配置文件路径，供界面提示用户可手动编辑。
+func (a *App) ConfigPath() string {
+	p, err := config.Path()
+	if err != nil {
+		return "(无法确定配置路径)"
+	}
+	return p
+}
+
+// Version 返回版本信息。
+func (a *App) Version() string { return version.String() }
+
+// ───────── AI 设置与对话 ─────────
+
+func (a *App) aiSettings() ai.Settings {
+	c := a.cfg.AI
+	return ai.Settings{BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model}
+}
+
+// AIPresets 返回服务商预设（设置页下拉）。
+func (a *App) AIPresets() []ai.Preset { return ai.Presets() }
+
+// SaveAISettings 保存 AI 接入配置并持久化。
+//
+// apiKey 传空表示「保持原值不变」——编辑设置时前端不回显密钥，
+// 避免明文密钥在界面与日志里来回出现。
+func (a *App) SaveAISettings(provider, baseURL, model, apiKey string) error {
+	baseURL = strings.TrimSpace(baseURL)
+	model = strings.TrimSpace(model)
+	if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+		return errors.New("base_url 必须以 http:// 或 https:// 开头")
+	}
+
+	a.cfg.AI.Provider = strings.TrimSpace(provider)
+	a.cfg.AI.BaseURL = baseURL
+	a.cfg.AI.Model = model
+	if apiKey != "" {
+		a.cfg.AI.APIKey = strings.TrimSpace(apiKey)
+	}
+	return a.cfg.Save()
+}
+
+// TestAI 用一条极短消息验证配置。只在用户点「测试连接」时发起请求。
+func (a *App) TestAI() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return ai.Test(ctx, a.aiSettings())
+}
+
+// ChatSend 发起一次流式对话。
+//
+// 增量通过事件推送：chat:delta {id, delta}；结束时 chat:done {id, content, error}。
+// 历史由前端持有并整体传入——后端不保存对话记录，
+// 这样「关闭程序即清空」的隐私语义清晰，也避免后端状态膨胀。
+func (a *App) ChatSend(id string, messages []ai.Message) error {
+	if !a.chatBusy.CompareAndSwap(false, true) {
+		return errors.New("上一条回复还在生成中")
+	}
+	s := a.aiSettings()
+	if !s.Valid() {
+		a.chatBusy.Store(false)
+		return errors.New("AI 尚未配置：请先到「设置」填写接口信息，或把主页切换为磁盘扫描")
+	}
+	if len(messages) == 0 {
+		a.chatBusy.Store(false)
+		return errors.New("消息为空")
+	}
+	// 限制历史长度，避免长对话把请求体撑爆（约 60 条足够）
+	if len(messages) > 60 {
+		messages = messages[len(messages)-60:]
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	a.chatMu.Lock()
+	a.chatCancel = cancel
+	a.chatMu.Unlock()
+
+	go func() {
+		defer a.chatBusy.Store(false)
+		defer cancel()
+
+		emitDelta := func(delta string) {
+			if a.ctx != nil {
+				runtime.EventsEmit(a.ctx, "chat:delta", map[string]string{"id": id, "delta": delta})
+			}
+		}
+
+		content, err := ai.Stream(ctx, s, messages, emitDelta)
+
+		errMsg := ""
+		if err != nil {
+			if ctx.Err() != nil {
+				errMsg = "（已停止生成）"
+				content += errMsg
+			} else {
+				errMsg = err.Error()
+			}
+		}
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "chat:done", map[string]string{
+				"id": id, "content": content, "error": errMsg,
+			})
+		}
+	}()
+
+	return nil
+}
+
+// ChatStop 停止正在生成的回复。
+func (a *App) ChatStop() {
+	a.chatMu.Lock()
+	cancel := a.chatCancel
+	a.chatMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// ───────── 扫描（扩展页之一，逻辑与 CLI 完全同源） ─────────
 
 // ProgressDTO 是前端轮询的进度快照。
 //
@@ -149,7 +508,7 @@ func (a *App) Result() *model.ScanResult {
 	return a.result
 }
 
-// Volumes 返回本机固定磁盘，供启动时选择扫描目标。
+// Volumes 返回本机固定磁盘，供扫描页选择目标。
 func (a *App) Volumes() []model.Volume {
 	vols, err := sys.EnumerateVolumes()
 	if err != nil {
@@ -158,8 +517,9 @@ func (a *App) Volumes() []model.Volume {
 	return vols
 }
 
-// Doctor 返回环境自检信息。
+// Doctor 返回环境自检信息（扫描页展示）。
 func (a *App) Doctor() []cli.Check {
+	winapi.SetConsoleUTF8() // 对 GUI 进程无害，保持与 CLI 一致的编码前提
 	return cli.RunDoctorChecks()
 }
 
@@ -184,18 +544,4 @@ func (a *App) ExportReport() (string, error) {
 		return abs, fmt.Errorf("已生成 %s，但自动打开失败: %w", abs, err)
 	}
 	return abs, nil
-}
-
-// EnvInfo 返回界面顶部展示的环境信息。
-func (a *App) EnvInfo() map[string]string {
-	elevated := sys.IsElevated()
-	s := "普通用户"
-	if elevated {
-		s = "管理员"
-	}
-	winapi.SetConsoleUTF8() // 对 GUI 进程无害，保持与 CLI 一致的编码前提
-	return map[string]string{
-		"elevated": s,
-		"note":     "普通用户模式下部分系统目录不可读，报告会标注归因缺口",
-	}
 }

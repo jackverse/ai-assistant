@@ -9,35 +9,86 @@
     --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --border:#2a2f3a;
     --fg:#e6e8ec; --muted:#9aa1ad; --accent:#60a5fa; --accent-soft:#1e293b;
     --danger:#f87171; --danger-soft:#3b1d1d; --warn:#fbbf24; --warn-soft:#3a2f10;
-    --bar:linear-gradient(90deg,#2563eb,#3b82f6);
+    --ok:#34d399; --bar:linear-gradient(90deg,#2563eb,#3b82f6);
+    --rail:#12151b;
   }
   * { box-sizing:border-box; }
-  body {
-    margin:0; background:var(--bg); color:var(--fg);
-    font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
-    user-select:none;
-  }
-  .wrap { max-width:1240px; margin:0 auto; padding:20px 22px 28px; }
-  .mono { font-family:ui-monospace,"Cascadia Mono",Consolas,monospace; font-size:12.5px; user-select:text; }
-  h1 { font-size:19px; margin:0; letter-spacing:-.01em; }
-  h1 small { font-size:11.5px; font-weight:400; color:var(--muted); margin-left:8px; }
-  .sub { color:var(--muted); font-size:12.5px; margin-top:2px; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+  .app { display:flex; height:100vh; overflow:hidden; }
+
+  /* ── 左侧导航 ── */
+  .rail { width:64px; background:var(--rail); border-right:1px solid var(--border);
+          display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:4px; flex:none; }
+  .rail .logo { font-size:20px; margin-bottom:8px; }
+  .rail button { appearance:none; background:none; border:0; color:var(--muted); cursor:pointer;
+                 width:48px; height:48px; border-radius:10px; font-size:19px; position:relative; }
+  .rail button:hover { background:var(--panel2); color:var(--fg); }
+  .rail button.on { background:var(--accent-soft); color:var(--accent); }
+  .rail button .tip { position:absolute; left:56px; top:50%; transform:translateY(-50%);
+                      background:var(--panel); border:1px solid var(--border); border-radius:6px;
+                      padding:3px 8px; font-size:12px; color:var(--fg); white-space:nowrap;
+                      display:none; z-index:50; }
+  .rail button:hover .tip { display:block; }
+  .rail .sp { flex:1; }
+  .rail .boot { writing-mode:vertical-rl; color:var(--muted); font-size:10.5px; margin-bottom:8px; }
+
+  /* ── 主区域 ── */
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .head { padding:14px 20px 10px; border-bottom:1px solid var(--border); background:var(--panel);
+          display:flex; align-items:baseline; gap:12px; flex:none; }
+  .head h1 { font-size:16px; margin:0; }
+  .head .sub { color:var(--muted); font-size:12px; }
+  .content { flex:1; overflow:auto; padding:18px 22px; }
 
   .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; }
   .pad { padding:14px; }
-
-  /* 控制区 */
-  .ctrl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px; }
-  select, button {
-    font:inherit; font-size:13.5px; color:var(--fg); background:var(--panel2);
-    border:1px solid var(--border); border-radius:7px; padding:8px 14px; cursor:pointer;
-  }
-  select:hover, button:hover { border-color:var(--accent); }
+  .mono { font-family:ui-monospace,"Cascadia Mono",Consolas,monospace; font-size:12px; user-select:text; }
+  button { font:inherit; font-size:13.5px; color:var(--fg); background:var(--panel2);
+           border:1px solid var(--border); border-radius:7px; padding:8px 14px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
   button.primary { background:var(--accent); border-color:var(--accent); color:#0b1220; font-weight:600; }
-  button.primary:disabled { opacity:.45; cursor:not-allowed; }
   button:disabled { opacity:.45; cursor:not-allowed; }
+  select, input[type=text], input[type=password], input[type=search] {
+    font:inherit; font-size:13.5px; color:var(--fg); background:var(--panel2);
+    border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
   label.chk { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:13px; cursor:pointer; }
+  .muted { color:var(--muted); }
+  .hidden { display:none !important; }
 
+  .banner { border-radius:10px; padding:11px 14px; margin-bottom:14px;
+            border:1px solid var(--border); background:var(--panel); }
+  .banner.warn { background:var(--warn-soft); }
+  .banner .t { font-weight:600; margin-bottom:5px; color:var(--warn); font-size:13px; }
+  .banner ul { margin:0; padding-left:18px; }
+  .banner li { margin:2px 0; font-size:12.5px; }
+
+  /* ── 聊天页 ── */
+  .chatwrap { display:flex; flex-direction:column; height:100%; }
+  .msgs { flex:1; overflow:auto; padding:4px 2px 12px; }
+  .msg { margin:10px 0; display:flex; }
+  .msg.me { justify-content:flex-end; }
+  .bubble { max-width:78%; padding:9px 13px; border-radius:12px; white-space:pre-wrap;
+            word-break:break-word; font-size:13.5px; }
+  .msg.ai .bubble { background:var(--panel); border:1px solid var(--border); user-select:text; }
+  .msg.me .bubble { background:var(--accent-soft); border:1px solid var(--border); }
+  .msg.sys { justify-content:center; }
+  .msg.sys .bubble { background:none; border:0; color:var(--muted); font-size:12.5px; }
+  .bubble.thinking { color:var(--muted); }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+  .chip { font-size:12.5px; padding:5px 12px; border-radius:999px; }
+  .inputrow { display:flex; gap:8px; padding-top:10px; border-top:1px solid var(--border); }
+  .inputrow textarea { flex:1; resize:none; font:inherit; font-size:13.5px; color:var(--fg);
+                       background:var(--panel2); border:1px solid var(--border); border-radius:8px;
+                       padding:9px 12px; min-height:44px; max-height:140px; }
+
+  /* ── 表格/卡片（扫描页） ── */
+  .cards { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); margin:16px 0; }
+  .stat .k { color:var(--muted); font-size:12px; }
+  .stat .v { font-size:21px; font-weight:650; margin-top:2px; letter-spacing:-.02em; }
+  .stat .s { color:var(--muted); font-size:12px; margin-top:2px; }
+  .card.crit .v { color:var(--danger); }
+  .ctrl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px; }
   .progress { height:8px; border-radius:5px; background:var(--border); overflow:hidden; margin-top:12px; }
   .progress > i { display:block; height:100%; width:0; background:var(--bar); transition:width .25s; }
   .progress.indeterminate > i { width:35% !important; animation:slide 1.2s ease-in-out infinite; }
@@ -45,109 +96,199 @@
   .pline { color:var(--muted); font-size:12.5px; margin-top:7px; min-height:18px;
            display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .pline .cur { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; }
-
-  /* 卡片 */
-  .cards { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); margin:16px 0; }
-  .stat .k { color:var(--muted); font-size:12px; }
-  .stat .v { font-size:21px; font-weight:650; margin-top:2px; letter-spacing:-.02em; }
-  .stat .s { color:var(--muted); font-size:12px; margin-top:2px; }
-  .card.crit .v { color:var(--danger); }
-  .card.crit .bar > i { background:var(--danger); }
-
-  /* 告警 */
-  .banner { border:1px solid var(--border); background:var(--warn-soft); border-radius:10px;
-            padding:11px 14px; margin-bottom:14px; }
-  .banner .t { color:var(--warn); font-weight:600; margin-bottom:5px; font-size:13px; }
-  .banner ul { margin:0; padding-left:18px; }
-  .banner li { margin:2px 0; font-size:12.5px; }
-
-  /* 表格 */
   .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); padding:0 8px;
-          background:var(--panel2); flex-wrap:wrap; align-items:center; }
+          background:var(--panel2); flex-wrap:wrap; align-items:center;
+          border-radius:10px 10px 0 0; }
   .tabs button.t { appearance:none; background:none; border:0; border-bottom:2px solid transparent;
                    color:var(--muted); padding:11px 12px; cursor:pointer; font:inherit; font-size:13.5px; }
   .tabs button.t.on { color:var(--accent); border-bottom-color:var(--accent); }
   .tabs .sp { flex:1; }
-  .tabs input { margin:6px 0; padding:6px 10px; min-width:190px; border:1px solid var(--border);
-                border-radius:6px; background:var(--panel); color:var(--fg); font:inherit; font-size:13px; }
   .bodybox { max-height:520px; overflow:auto; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   thead th { position:sticky; top:0; background:var(--panel2); text-align:left; font-weight:600;
              font-size:12px; color:var(--muted); padding:9px 12px; border-bottom:1px solid var(--border);
              white-space:nowrap; cursor:pointer; user-select:none; z-index:1; }
-  thead th:hover { color:var(--fg); }
   th.num, td.num { text-align:right; font-variant-numeric:tabular-nums; }
   tbody td { padding:7px 12px; border-bottom:1px solid var(--border); }
   tbody tr:hover { background:var(--panel2); }
   td.path { word-break:break-all; }
-  .cellbar { position:relative; min-width:110px; }
-  .cellbar > i { display:block; height:16px; background:var(--accent-soft); border-radius:3px; min-width:2px; }
-  .cellbar > span { position:absolute; left:6px; top:0; line-height:16px; font-size:11.5px; }
   .badge { display:inline-block; font-size:11px; padding:1px 6px; border-radius:999px; margin-left:6px; }
   .b-link { background:var(--accent-soft); color:var(--accent); }
   .b-sum  { background:var(--border); color:var(--muted); }
   .b-warn { background:var(--danger-soft); color:var(--danger); }
-
   .kv { padding:4px 16px 14px; }
   .kv div { display:flex; gap:16px; padding:7px 0; border-bottom:1px solid var(--border); }
   .kv div:last-child { border-bottom:0; }
   .kv b { flex:0 0 190px; font-weight:500; color:var(--muted); }
   .kv span { flex:1; white-space:pre-wrap; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; user-select:text; }
-
+  .note { color:var(--muted); font-size:12.5px; padding:12px 16px; border-top:1px solid var(--border); }
   .empty { padding:56px 20px; text-align:center; color:var(--muted); }
   .empty .big { font-size:15px; color:var(--fg); margin-bottom:6px; }
-  .hidden { display:none !important; }
-  footer { color:var(--muted); font-size:12px; padding:14px 2px 0; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .err { color:var(--danger); }
+
+  /* ── 设置页 ── */
+  .form { display:grid; gap:10px; grid-template-columns:150px 1fr; align-items:center; margin:6px 0; }
+  .form label { color:var(--muted); font-size:13px; }
+  .form .wide { grid-column:1 / -1; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .modlist { margin-top:10px; }
+  .modrow { display:flex; align-items:center; gap:12px; padding:9px 4px; border-bottom:1px solid var(--border); }
+  .modrow:last-child { border-bottom:0; }
+  .modrow .n { flex:1; }
+  .modrow .n b { font-weight:600; }
+  .modrow .n .d { color:var(--muted); font-size:12px; }
+  footer { color:var(--muted); font-size:12px; padding:12px 20px; border-top:1px solid var(--border);
+           display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; flex:none;
+           background:var(--panel); }
+  .toast { position:fixed; right:18px; bottom:18px; background:var(--panel); border:1px solid var(--border);
+           border-radius:10px; padding:10px 14px; font-size:12.5px; max-width:440px;
+           box-shadow:0 8px 30px rgba(0,0,0,.4); z-index:99; }
+  .page { display:none; flex:1; flex-direction:column; overflow:hidden; }
+  .page.on { display:flex; }
 </style>
 </head>
 <body>
-<div class="wrap">
-
-  <h1>Windows 助手<small id="ver"></small></h1>
-  <div class="sub" id="envline">磁盘空间治理：先看清空间去哪了，再决定删什么、搬什么</div>
-
-  <div class="card" style="margin-top:16px">
-    <div class="ctrl">
-      <span style="color:var(--muted);font-size:13px">扫描目标</span>
-      <select id="disk"></select>
-      <label class="chk"><input type="checkbox" id="deep"> 深度模式<span style="color:var(--muted)">(精确但慢)</span></label>
-      <button class="primary" id="btnStart">开始扫描</button>
-      <button id="btnCancel" class="hidden">取消</button>
-      <span id="envStatus" style="color:var(--muted);font-size:12.5px"></span>
+<div class="app">
+  <nav class="rail">
+    <div class="logo">🪟</div>
+    <div id="rail"></div>
+    <div class="sp"></div>
+    <div class="boot" id="bootms"></div>
+    <button id="btnSettings" title="设置">⚙️<span class="tip">设置</span></button>
+  </nav>
+  <div class="main">
+    <div class="head">
+      <h1 id="pageTitle">Windows 助手</h1>
+      <span class="sub" id="pageSub"></span>
     </div>
-    <div class="pad hidden" id="progwrap" style="padding-top:0">
-      <div class="progress" id="pbar"><i></i></div>
-      <div class="pline">
-        <span id="pstat"></span>
-        <span class="cur mono" id="pcur"></span>
+    <div class="content">
+
+      <!-- 聊天页 -->
+      <div class="page" id="page-chat">
+        <div id="chatSetup" class="hidden"></div>
+        <div class="chatwrap" id="chatMain">
+          <div class="msgs" id="msgs"></div>
+          <div class="chips" id="chips"></div>
+          <div class="inputrow">
+            <textarea id="chatInput" placeholder="输入消息…（Enter 发送，Shift+Enter 换行）"></textarea>
+            <button class="primary" id="btnSend">发送</button>
+            <button id="btnStop" class="hidden">停止</button>
+          </div>
+        </div>
       </div>
+
+      <!-- 扫描页 -->
+      <div class="page" id="page-scan">
+        <div class="card">
+          <div class="ctrl">
+            <span class="muted" style="font-size:13px">扫描目标</span>
+            <select id="disk"></select>
+            <label class="chk"><input type="checkbox" id="deep"> 深度模式<span class="muted">(精确但慢)</span></label>
+            <button class="primary" id="btnStart">开始扫描</button>
+            <button id="btnCancel" class="hidden">取消</button>
+            <span id="envStatus" class="muted" style="font-size:12.5px"></span>
+          </div>
+          <div class="pad hidden" id="progwrap" style="padding-top:0">
+            <div class="progress" id="pbar"><i></i></div>
+            <div class="pline"><span id="pstat"></span><span class="cur mono" id="pcur"></span></div>
+          </div>
+        </div>
+        <div id="scanbanners" style="margin-top:14px"></div>
+        <div id="results"></div>
+        <div class="card" id="scanEmpty">
+          <div class="empty">
+            <div class="big">还没有扫描结果</div>
+            <div>选择扫描目标后点击「开始扫描」。扫描是只读操作，不会改动任何文件，也不需要管理员权限。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 占位页（清理/迁移等未完成模块） -->
+      <div class="page" id="page-placeholder">
+        <div class="card"><div class="empty">
+          <div class="big" id="phTitle"></div>
+          <div id="phDesc" class="pad"></div>
+        </div></div>
+      </div>
+
+      <!-- 设置页 -->
+      <div class="page" id="page-settings">
+        <div class="banner warn hidden" id="setWarn"></div>
+
+        <div class="card">
+          <div class="pad">
+            <b>启动主页</b>
+            <div class="muted" style="font-size:12.5px;margin:2px 0 10px">
+              主功能恰好一个：启动时直接进入该页面。其余已启用功能作为扩展页放在左侧导航。
+            </div>
+            <div class="row" id="homeOptions"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="pad">
+            <b>AI 大模型</b>
+            <div class="muted" style="font-size:12.5px;margin:2px 0 10px">
+              采用 OpenAI 兼容接口。未配置时聊天页只提供本地快捷功能，<b style="color:var(--fg)">不会产生任何网络请求</b>。
+              API Key 以明文保存在本机配置文件中，请注意保管。
+            </div>
+            <div class="form">
+              <label>服务商预设</label>
+              <select id="aiProvider"></select>
+              <label>Base URL</label>
+              <input type="text" id="aiBaseURL" placeholder="https://api.deepseek.com/v1">
+              <label>API Key</label>
+              <input type="password" id="aiKey" placeholder="已保存（留空表示不修改）">
+              <label>模型</label>
+              <input type="text" id="aiModel" placeholder="deepseek-chat">
+              <div class="wide row">
+                <button class="primary" id="btnSaveAI">保存</button>
+                <button id="btnTestAI">测试连接</button>
+                <span id="aiStatus" class="muted" style="font-size:12.5px"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="pad">
+            <b>功能模块</b>
+            <div class="muted" style="font-size:12.5px;margin:2px 0 4px">
+              开关即配置（写入 config.yaml，重启后依然生效）。禁用的模块不初始化、不做任何磁盘 IO。
+            </div>
+            <div class="modlist" id="modlist"></div>
+            <div class="muted" style="font-size:12px;margin-top:10px">配置文件：<span class="mono" id="cfgpath"></span></div>
+          </div>
+        </div>
+      </div>
+
     </div>
+    <footer>
+      <span id="footnote">本工具当前只读：不删除、不迁移、不修改系统设置。无后台服务、无开机自启，关闭窗口即完全退出。</span>
+      <span><button id="btnExport" class="hidden">导出 HTML 报告</button></span>
+    </footer>
   </div>
-
-  <div id="banners"></div>
-  <div id="results"></div>
-
-  <div class="card" id="empty">
-    <div class="empty">
-      <div class="big">还没有扫描结果</div>
-      <div>选择扫描目标后点击「开始扫描」。扫描是只读操作，不会改动任何文件，也不需要管理员权限。</div>
-    </div>
-  </div>
-
-  <footer>
-    <span id="footnote">本工具当前只读：不删除、不迁移、不修改系统设置。清理功能在后续版本提供。</span>
-    <span><button id="btnExport" class="hidden">导出 HTML 报告</button></span>
-  </footer>
 </div>
 
 <script>
-const App = () => window.go.main.App;
+// 全局错误直接显示在界面上。
+// 生产构建没有 devtools，JS 异常若只进 console，表象就是「页面空白」，
+// 排查要靠猜。宁可丑一点，也要让错误可见。
+window.addEventListener('error', e => toast('脚本错误: ' + e.message, true));
+window.addEventListener('unhandledrejection', e => toast('未处理的异常: ' + (e.reason && e.reason.message || e.reason), true));
+
+const A = () => window.go.main.App;
+const R = () => window.runtime;
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $ = s => document.querySelector(s);
 
 let pollTimer = null;
-let lastKey = '';
-
-function el(id) { return document.getElementById(id); }
+let scanReady = false;
+let chatReady = false;
+let chatHistory = [];     // {role, content}
+let streaming = false;
+let curPage = '';
+let chatConfigured = null;
 
 function fmtBytes(n) {
   if (n == null) return '-';
@@ -158,77 +299,310 @@ function fmtBytes(n) {
   while (v >= u && i < names.length - 1) { v /= u; i++; }
   return (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + ' ' + names[i];
 }
-function fmtCount(n) { return (n == null ? '-' : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')); }
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const fmtCount = n => (n == null ? '-' : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
+function toast(msg, warn) {
+  const d = document.createElement('div');
+  d.className = 'toast';
+  if (warn) {
+    d.style.borderColor = 'var(--danger)';
+    d.style.color = 'var(--danger)';
+    d.style.whiteSpace = 'pre-wrap';
+    // 错误提示不自动消失：排查「页面空白」类问题时，看不到报错就只能靠猜
+    d.addEventListener('click', () => d.remove());
+  } else {
+    setTimeout(() => d.remove(), 8000);
+  }
+  d.textContent = msg;
+  document.body.appendChild(d);
+}
 
-  async function init() {
-    // 卷列表
-    // 注意：后端走 JSON 序列化，字段是 snake_case（model.Volume 的 json tag），
-    // 不是 Go 的字段名。之前写成 v.Letter/v.FreeBytes 导致界面显示 undefined。
+/* ───────── 导航 ───────── */
+const PAGE_META = {
+  chat: { icon: '💬', name: 'AI 助手', sub: '与大模型对话；未配置大模型时也可使用下方本地快捷功能' },
+  scan: { icon: '🔍', name: '磁盘扫描', sub: '只读统计：看清每个盘的空间被什么占了' },
+  clean: { icon: '🧹', name: '垃圾清理', sub: '按可清理性分级判定（开发中）' },
+  migrate: { icon: '📦', name: '空间迁移', sub: '把庞然大物搬到其他盘（规划中）' },
+  settings: { icon: '⚙️', name: '设置', sub: '主页选择 · AI 接入 · 模块开关' },
+};
+
+async function renderRail() {
+  let mods = [];
+  try {
+    // 调试：列出后端实际注入的绑定方法名
+    const names = (window.go && window.go.main && window.go.main.App)
+      ? Object.keys(window.go.main.App).join(',') : '(无 App 对象)';
+    console.log('bound methods:', names);
+
+    mods = await A().ListModules();
+    if (!mods) mods = [];
+    if (mods.length === 0) {
+      el('rail').insertAdjacentHTML('beforeend',
+        '<div style="color:var(--danger);font-size:10px;writing-mode:vertical-rl">无模块</div>');
+    }
+  } catch (e) {
+    const app = (window.go && window.go.main && window.go.main.App) || {};
+    const keys = Object.keys(app);
+    const dbg =
+      'keys=' + keys.length +
+      ' | hasModules=' + ('Modules' in app) +
+      ' | typeofModules=' + typeof app.Modules +
+      ' | typeofGetSettings=' + typeof app.GetSettings +
+      ' | typeofStartScan=' + typeof app.StartScan +
+      ' | keys=' + keys.join(',');
+    el('rail').insertAdjacentHTML('beforeend',
+      `<div style="color:var(--danger);font-size:10px;white-space:normal;width:200px;word-break:break-all">${esc(dbg)}<br>ERR:${esc(String(e && e.message || e))}</div>`);
+    toast('Modules 调用失败: ' + String(e && e.message || e), true);
+    return;
+  }
+
+  const rail = el('rail');
+  rail.innerHTML = '';
+  mods.forEach(m => {
+    if (!m.enabled) return;   // 禁用的模块不出现在导航
+    const meta = PAGE_META[m.meta.id] || { icon: m.meta.icon || '📄', name: m.meta.name, sub: m.meta.desc };
+    const b = document.createElement('button');
+    b.dataset.page = m.meta.id;
+    b.innerHTML = `${meta.icon}<span class="tip">${esc(meta.name)}</span>`;
+    b.addEventListener('click', () => openPage(m.meta.id));
+    rail.appendChild(b);
+  });
+  // 设置按钮固定在底部
+  el('btnSettings').onclick = () => openPage('settings');
+}
+
+function markActive(page) {
+  document.querySelectorAll('#rail button').forEach(b =>
+    b.classList.toggle('on', b.dataset.page === page || (page === 'settings' && b.id === 'btnSettings')));
+  el('btnSettings').classList.toggle('on', page === 'settings');
+}
+
+async function openPage(id) {
+  if (id === curPage) return;
+
+  // 进入模块页前先走懒加载入口（首次会触发该模块的初始化钩子）
+  if (id !== 'settings') {
     try {
-      const vols = await App().Volumes() || [];
-      const sel = el('disk');
-      sel.innerHTML = vols.map(v =>
-        `<option value="${esc(v.letter)}" ${v.is_system ? 'selected' : ''}>${esc(v.letter)}: ${esc(v.label || '')}（剩余 ${fmtBytes(v.free_bytes)}）</option>`
-      ).join('');
-    } catch (e) { console.warn(e); }
+      const r = await A().EnterModule(id);
+      if (r && !r.ok) { toast(r.message || '无法进入该页面', true); return; }
+    } catch (e) { toast(String(e), true); return; }
+  }
 
-    // 环境自检（cli.Check 的 json tag 同样是 snake_case）
-    try {
-      const checks = await App().Doctor() || [];
-      const bad = checks.filter(c => !c.ok);
-      el('envStatus').textContent = checks.length
-        ? '环境：' + checks.map(c => c.name + ' ' + (c.ok ? '✓' : '✗')).join(' · ')
-        : '';
-      el('envStatus').title = checks.map(c => c.name + '：' + c.result).join('\n');
-      if (bad.length) el('envStatus').style.color = 'var(--warn)';
-    } catch (e) { console.warn(e); }
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  const pg = el('page-' + id) || el('page-placeholder');
+  pg.classList.add('on');
+  const meta = PAGE_META[id] || { name: id, sub: '' };
+  el('pageTitle').textContent = meta.name;
+  el('pageSub').textContent = meta.sub;
+  markActive(id);
+  curPage = id;
 
-  el('btnStart').addEventListener('click', startScan);
-  el('btnCancel').addEventListener('click', () => App().CancelScan());
+  if (id === 'chat') await initChat();
+  if (id === 'scan') await initScan();
+  if (id === 'settings') await initSettings();
+  if (id === 'clean' || id === 'migrate') {
+    el('phTitle').textContent = PAGE_META[id].name + '（' + (id === 'clean' ? '开发中' : '规划中') + '）';
+    el('phDesc').textContent = '该模块已在架构中注册，但功能尚未实现。你可以在「设置 → 功能模块」里把它停用，' +
+      '这样它连导航都不会出现；等版本发布后再打开。';
+  }
+}
+
+/* ───────── 聊天页 ───────── */
+async function initChat() {
+  if (chatReady) return;
+  chatReady = true;
+
+  R().EventsOn('chat:delta', data => {
+    if (data.id !== curStreamId) return;
+    const b = streamingBubble();
+    if (b) { b.textContent += data.delta; scrollMsgs(); }
+  });
+  R().EventsOn('chat:done', data => {
+    if (data.id !== curStreamId) return;
+    finishStream(data);
+  });
+
+  el('btnSend').addEventListener('click', sendChat);
+  el('btnStop').addEventListener('click', () => A().ChatStop());
+  el('chatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+
+  // 快捷功能卡：不依赖大模型、不联网，纯本地入口（L1）
+  const chips = [
+    { t: '🔍 扫描 C 盘', fn: () => quickScan('C') },
+    { t: '📄 查看最大文件', fn: () => quickMax() },
+    { t: '🧹 垃圾清理（开发中）', fn: () => sysMsg('垃圾清理模块还在开发中。设计见 docs/design/06-可清理性分级.md。') },
+  ];
+  const box = el('chips');
+  chips.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = c.t;
+    b.addEventListener('click', c.fn);
+    box.appendChild(b);
+  });
+
+  await refreshChatConfigured();
+  if (chatConfigured === false) showChatSetup();
+}
+
+async function refreshChatConfigured() {
+  const s = await A().GetSettings();
+  chatConfigured = s.ai.configured;
+  return s;
+}
+
+function showChatSetup() {
+  const box = el('chatSetup');
+  box.classList.remove('hidden');
+  box.className = 'banner warn';
+  box.innerHTML = `<div class="t">AI 尚未配置</div>
+    <div style="font-size:12.5px">
+      当前处于本地模式：下方快捷功能可正常使用，但无法对话。<br>
+      到 <a href="#" id="goSettings" style="color:var(--accent)">设置</a> 填入 OpenAI 兼容接口（如 DeepSeek/Kimi/智谱）即可启用对话；
+      或者到设置里把「启动主页」改为磁盘扫描，让本程序以纯工具形态启动（聊天模块也可以直接停用）。
+    </div>`;
+  box.querySelector('#goSettings').addEventListener('click', e => { e.preventDefault(); openPage('settings'); });
+}
+
+let curStreamId = '';
+function bubbleEl(cls, text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + cls;
+  const b = document.createElement('div');
+  b.className = 'bubble' + (cls === 'ai' ? ' thinking' : '');
+  b.textContent = text || '';
+  wrap.appendChild(b);
+  el('msgs').appendChild(wrap);
+  scrollMsgs();
+  return b;
+}
+function streamingBubble() {
+  if (!streamingBubble.node || !streamingBubble.node.isConnected) {
+    streamingBubble.node = bubbleEl('ai', '');
+  }
+  streamingBubble.node.classList.remove('thinking');
+  return streamingBubble.node;
+}
+function scrollMsgs() { const m = el('msgs'); m.scrollTop = m.scrollHeight; }
+function sysMsg(text) { bubbleEl('sys', text); }
+
+async function sendChat() {
+  const inp = el('chatInput');
+  const text = inp.value.trim();
+  if (!text || streaming) return;
+
+  // 未配置时给出明确引导，而不是报错
+  if (chatConfigured === false) {
+    sysMsg('AI 尚未配置。请到「设置 → AI 大模型」填写接口信息；或先用下方的本地快捷功能。');
+    showChatSetup();
+    return;
+  }
+
+  chatHistory.push({ role: 'user', content: text });
+  bubbleEl('me', text);
+  inp.value = '';
+
+  streaming = true;
+  curStreamId = 's' + Date.now();
+  streamingBubble.node = null;
+  bubbleEl('ai', '正在思考…');
+  el('btnSend').disabled = true;
+  el('btnStop').classList.remove('hidden');
+
+  // 后端流式生成，增量经 chat:delta 事件推回
+  try {
+    await A().ChatSend(curStreamId, chatHistory.slice());
+  } catch (e) {
+    streaming = false;
+    el('btnSend').disabled = false;
+    el('btnStop').classList.add('hidden');
+    bubbleEl('ai', '').textContent = String(e);
+  }
+}
+
+function finishStream(data) {
+  streaming = false;
+  el('btnSend').disabled = false;
+  el('btnStop').classList.add('hidden');
+
+  const node = streamingBubble.node && streamingBubble.node.isConnected
+    ? streamingBubble.node : null;
+  const finalText = data.error ? (data.content || '') + '\n\n⚠️ ' + data.error : data.content;
+  if (node) { node.textContent = finalText; node.classList.remove('thinking'); }
+  chatHistory.push({ role: 'assistant', content: data.content || '' });
+  streamingBubble.node = null;
+  scrollMsgs();
+}
+
+/* 快捷功能：本地确定性入口 */
+async function quickScan(disk) {
+  await A().StartScan(disk, false);
+  await openPage('scan');
+  startScanUI();
+}
+async function quickMax() {
+  const res = await A().Result();
+  if (!res || !(res.largest_files || []).length) {
+    sysMsg('还没有扫描结果。先点上方「🔍 扫描 C 盘」，完成后这里会列出最大的文件。');
+    return;
+  }
+  const lines = (res.largest_files || []).slice(0, 5)
+    .map(f => `· ${fmtBytes(f.on_disk)}  ${f.path}`).join('\n');
+  sysMsg('当前最大的 5 个文件：\n' + lines);
+}
+
+/* ───────── 扫描页 ───────── */
+async function initScan() {
+  if (scanReady) return;
+  scanReady = true;
+
+  try {
+    const vols = await A().Volumes() || [];
+    el('disk').innerHTML = vols.map(v =>
+      `<option value="${esc(v.letter)}" ${v.is_system ? 'selected' : ''}>${esc(v.letter)}: ${esc(v.label || '')}（剩余 ${fmtBytes(v.free_bytes)}）</option>`
+    ).join('');
+  } catch (e) { console.warn(e); }
+
+  try {
+    const checks = await A().Doctor() || [];
+    const bad = checks.filter(c => !c.ok);
+    el('envStatus').textContent = checks.length
+      ? '环境：' + checks.map(c => c.name + ' ' + (c.ok ? '✓' : '✗')).join(' · ') : '';
+    el('envStatus').title = checks.map(c => c.name + '：' + c.result).join('\n');
+    if (bad.length) el('envStatus').style.color = 'var(--warn)';
+  } catch (e) { console.warn(e); }
+
+  el('btnStart').addEventListener('click', startScanUI);
+  el('btnCancel').addEventListener('click', () => A().CancelScan());
   el('btnExport').addEventListener('click', async () => {
-    try {
-      const p = await App().ExportReport();
-      appendBanner('ok', '已生成并打开 HTML 报告：' + p);
-    } catch (e) { appendBanner('warn', String(e)); }
+    try { toast('已生成并打开 HTML 报告：' + await A().ExportReport()); }
+    catch (e) { toast(String(e), true); }
   });
 }
 
-function appendBanner(kind, text) {
-  const cls = kind === 'ok' ? 'b-link' : 'b-warn';
-  const color = kind === 'ok' ? 'var(--accent)' : 'var(--warn)';
-  const box = el('banners');
-  const div = document.createElement('div');
-  div.className = 'banner';
-  div.innerHTML = `<div class="t" style="color:${color}">${kind === 'ok' ? '完成' : '提示'}</div><div style="font-size:12.5px">${esc(text)}</div>`;
-  box.appendChild(div);
-  setTimeout(() => div.remove(), 12000);
-}
-
-async function startScan() {
-  const disk = el('disk').value;
-  const deep = el('deep').checked;
-  try { await App().StartScan(disk, deep); } catch (e) { appendBanner('warn', String(e)); return; }
-
-  el('btnStart').disabled = true;
-  el('btnCancel').classList.remove('hidden');
-  el('progwrap').classList.remove('hidden');
-  el('empty').classList.add('hidden');
-  el('results').innerHTML = '';
-  el('banners').innerHTML = '';
-  el('pbar').classList.add('indeterminate');
-
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(poll, 200);
-  poll();
+function startScanUI() {
+  const disk = el('disk').value, deep = el('deep').checked;
+  A().StartScan(disk, deep).then(() => {
+    el('btnStart').disabled = true;
+    el('btnCancel').classList.remove('hidden');
+    el('scanEmpty').classList.add('hidden');
+    el('results').innerHTML = '';
+    el('scanbanners').innerHTML = '';
+    el('progwrap').classList.remove('hidden');
+    el('pbar').classList.add('indeterminate');
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(poll, 200);
+    poll();
+  }).catch(e => toast(String(e), true));
 }
 
 async function poll() {
   let p;
-  try { p = await App().Progress(); } catch (e) { return; }
+  try { p = await A().Progress(); } catch (e) { return; }
 
   // 字段名遵循后端 ProgressDTO 的 json tag（snake_case）。
-  // 特别注意 p.running：如果误写成 p.Running 会得到 undefined（falsy），
+  // 特别注意 p.running：误写成 p.Running 会得到 undefined（falsy），
   // 轮询会在第一次就误判「扫描已结束」而提前退出。
   el('pstat').textContent =
     `${fmtCount(p.files)} 文件 · ${fmtCount(p.dirs)} 目录 · ${fmtBytes(p.bytes)} · 跳过 ${fmtCount(p.skipped)} · ${(p.elapsed_ms/1000).toFixed(1)}s`;
@@ -242,27 +616,30 @@ async function poll() {
     el('btnStart').disabled = false;
     el('btnCancel').classList.add('hidden');
 
-    if (p.error) { appendBanner('warn', '扫描出错：' + p.error); }
-    const res = await App().Result();
+    if (p.error) banner('scanbanners', '扫描出错', [p.error]);
+    const res = await A().Result();
     if (res) { render(res); el('btnExport').classList.remove('hidden'); }
-    else { appendBanner('warn', '扫描已结束但没有得到结果，请重试'); }
+    else banner('scanbanners', '扫描已结束但没有得到结果', ['请重试；若反复出现请用命令行模式查看错误详情']);
   }
+}
+
+function banner(boxId, title, items) {
+  el(boxId).innerHTML = `<div class="banner warn"><div class="t">${esc(title)}</div><ul>${
+    items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`;
 }
 
 function render(res) {
   const s = res.stats || {};
   let html = '';
-
   if ((res.warnings || []).length) {
-    html += `<div class="banner"><div class="t">需要注意</div><ul>${
+    html += `<div class="banner warn"><div class="t">需要注意</div><ul>${
       res.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
   }
 
-  // 卡片
   html += '<div class="cards">';
   (res.volumes || []).forEach(v => {
     if (!v.scanned && !v.is_system) return;
-    const pct = v.used_bytes ? (v.used_bytes / v.total_bytes * 100) : 0;
+    const pct = v.total_bytes ? (v.used_bytes / v.total_bytes * 100) : 0;
     const crit = pct > 90;
     html += `<div class="card stat${crit ? ' crit' : ''}">
       <div class="k">${esc(v.letter)}: ${esc(v.label||'—')} · ${esc(v.file_system)}${v.is_system ? ' · 系统盘' : ''}</div>
@@ -278,7 +655,6 @@ function render(res) {
            <div class="s">文件 · ${fmtCount(s.dirs_scanned)} 目录 · ${(res.duration_ms/1000).toFixed(1)}s</div></div>`;
   html += '</div>';
 
-  // 表格
   html += `<div class="card">
     <div class="tabs">
       <button class="t on" data-tab="dirs">目录占用</button>
@@ -328,26 +704,21 @@ function render(res) {
         ['最大深度', String(s.max_depth_reached)],
       ].map(([k, v]) => `<div><b>${k}</b><span>${esc(v)}</span></div>`).join('')
     }</div>
-    <div class="note" style="color:var(--muted);font-size:12.5px;padding:12px 16px;border-top:1px solid var(--border)">
+    <div class="note">
       ${s.hard_link_dedup ? '深度模式：已按文件索引去重硬链接。' : '快速模式未去重硬链接：NTFS 硬链接会被重复计入，C:\\Windows 这类目录体积会偏高。用深度模式可得精确值。'}
       ${s.volume_used_bytes ? ' 扫描统计与卷实际已用的差异包含两个方向的误差（高估与低估），数字接近不代表覆盖完整。' : ''}
     </div></div>
   </div>`;
 
   el('results').innerHTML = html;
-  wireTabs();
-}
 
-function wireTabs() {
-  const btns = document.querySelectorAll('.tabs button.t');
+  const btns = document.querySelectorAll('#results .tabs button.t');
   const panes = { dirs: 'tab-dirs', files: 'tab-files', stats: 'tab-stats' };
   btns.forEach(b => b.addEventListener('click', () => {
     btns.forEach(x => x.classList.toggle('on', x === b));
     Object.entries(panes).forEach(([k, id]) => el(id).classList.toggle('hidden', k !== b.dataset.tab));
-    const q = el('q');
-    q.style.visibility = b.dataset.tab === 'stats' ? 'hidden' : 'visible';
+    el('q').style.visibility = b.dataset.tab === 'stats' ? 'hidden' : 'visible';
   }));
-
   const q = el('q');
   q.addEventListener('input', () => {
     const n = q.value.toLowerCase();
@@ -357,7 +728,101 @@ function wireTabs() {
   });
 }
 
-window.addEventListener('DOMContentLoaded', init);
+/* ───────── 设置页 ───────── */
+async function initSettings() {
+  const s = await A().GetSettings();
+
+  // 启动主页
+  el('homeOptions').innerHTML = (s.pages || []).map(p =>
+    `<button data-home="${esc(p.id)}" class="${p.current ? 'primary' : ''}">${esc(p.name)}</button>`
+  ).join('') || '<span class="muted">没有可用页面</span>';
+  el('homeOptions').querySelectorAll('button[data-home]').forEach(b => {
+    b.addEventListener('click', async () => {
+      try {
+        await A().SetHome(b.dataset.home);
+        toast('启动主页已设为 ' + b.dataset.home);
+        await initSettings();
+      } catch (e) { toast(String(e), true); }
+    });
+  });
+
+  // AI 预设
+  let presets = [];
+  try { presets = await A().AIPresets() || []; } catch (e) {}
+  el('aiProvider').innerHTML = '<option value="">— 选择预设 —</option>' +
+    presets.map(p => `<option value="${esc(p.id)}" data-bu="${esc(p.base_url)}" data-m="${esc(p.model)}">${esc(p.name)}</option>`).join('');
+  el('aiProvider').onchange = () => {
+    const opt = el('aiProvider').selectedOptions[0];
+    if (opt && opt.dataset.bu !== undefined && opt.value) {
+      el('aiBaseURL').value = opt.dataset.bu;
+      el('aiModel').value = opt.dataset.m;
+    }
+  };
+
+  el('aiProvider').value = s.ai.provider || '';
+  el('aiBaseURL').value = s.ai.base_url || '';
+  el('aiModel').value = s.ai.model || '';
+  el('aiStatus').textContent = s.ai.configured ? '✓ 已配置' : '未配置（聊天页将处于本地模式）';
+  el('cfgpath').textContent = s.config_path;
+
+  el('btnSaveAI').onclick = async () => {
+    try {
+      await A().SaveAISettings(el('aiProvider').value, el('aiBaseURL').value, el('aiModel').value, el('aiKey').value);
+      el('aiKey').value = '';
+      toast('AI 配置已保存');
+      await initSettings();
+    } catch (e) { toast(String(e), true); }
+  };
+  el('btnTestAI').onclick = async () => {
+    el('aiStatus').textContent = '测试中…';
+    try {
+      await A().SaveAISettings(el('aiProvider').value, el('aiBaseURL').value, el('aiModel').value, el('aiKey').value);
+      el('aiKey').value = '';
+      await A().TestAI();
+      el('aiStatus').textContent = '✓ 连接成功';
+    } catch (e) { el('aiStatus').textContent = '✗ ' + String(e); el('aiStatus').style.color = 'var(--danger)'; return; }
+    el('aiStatus').style.color = '';
+    await initSettings();
+  };
+
+  // 模块开关
+  el('modlist').innerHTML = (s.modules || []).map(m => `
+    <div class="modrow">
+      <span style="font-size:17px">${esc(m.meta.icon)}</span>
+      <div class="n"><b>${esc(m.meta.name)}</b><span class="d"> — ${esc(m.meta.desc)}</span></div>
+      <span class="muted" style="font-size:11.5px">${m.meta.status === 'ready' ? '可用' : m.meta.status === 'development' ? '开发中' : '规划中'}</span>
+      <label class="chk"><input type="checkbox" data-toggle="${esc(m.meta.id)}" ${m.enabled ? 'checked' : ''}>启用</label>
+    </div>`).join('');
+  el('modlist').querySelectorAll('input[data-toggle]').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      try {
+        await A().SetModuleEnabled(inp.dataset.toggle, inp.checked);
+        toast(`${inp.dataset.toggle} 已${inp.checked ? '启用' : '禁用'}，配置已保存`);
+        await renderRail();
+        if (!inp.checked && curPage === inp.dataset.toggle) openPage('settings');
+      } catch (e) { toast(String(e), true); }
+    });
+  });
+
+  const warns = await A().BootWarnings() || [];
+  el('setWarn').classList.toggle('hidden', warns.length === 0);
+  if (warns.length) banner('setWarn', '启动提示', warns);
+}
+
+/* ───────── 启动 ───────── */
+window.addEventListener('DOMContentLoaded', async () => {
+  await renderRail();
+
+  // 主页 = 配置指向的页面（后端已做回退解析）
+  let home = 'scan';
+  try { home = await A().HomePage() || 'scan'; } catch (e) {}
+  const ms = await A().BootMS().catch(() => 0);
+  el('bootms').textContent = `启动 ${ms}ms`;
+
+  await openPage(home);
+  el('footnote').textContent =
+    '本工具当前只读：不删除、不迁移、不修改系统设置。单进程轻入口，无后台服务、无开机自启，关闭窗口即完全退出。';
+});
 </script>
 </body>
 </html>
