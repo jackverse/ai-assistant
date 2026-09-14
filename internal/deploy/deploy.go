@@ -202,7 +202,7 @@ func Run(ctx context.Context, cfg Config, opts RunOptions, emit func(Event)) err
 			mod.Root = mod.Name
 		}
 
-		modDir := filepath.Join(base, j.proj.Root, mod.Root)
+		modDir := resolveModuleDir(base, j.proj, mod)
 		var err error
 		var out string
 		switch mod.Type {
@@ -604,6 +604,42 @@ func filterEnvFiles(assemblyDir, keepEnv string) (int, error) {
 		removed++
 	}
 	return removed, nil
+}
+
+// resolveModuleDir 解析模块目录。
+//
+// Module.Root 的语义是【相对项目根】。但配置可能来自三个途径，
+// 语义不一定可靠：
+//   - 自动扫描（本程序生成，语义正确）
+//   - 导入既有工具配置（模块往往只有 name、没有 root）
+//   - 用户手改（可能误写成相对代码根，如 wic-sh/wic-admin）
+//
+// 因此按候选顺序取第一个真实存在的目录；都找不到时返回主候选，
+// 让报错指向最可能的位置。这条容错实测救过一次配置：
+// 早期版本的扫描把 Root 写成了相对代码根，预检报出
+// D:\code\wic-sh\wic-sh\wic-admin，靠这里自动纠正回正确目录。
+func resolveModuleDir(base string, proj ProjectConfig, mod ModuleConfig) string {
+	root := strings.TrimSpace(mod.Root)
+	if root == "" {
+		root = mod.Name
+	}
+	primary := filepath.Join(base, proj.Root, filepath.FromSlash(root))
+
+	cands := []string{primary}
+	if mod.Name != "" && root != mod.Name && root != "." {
+		// 退一步：模块目录就叫模块名
+		cands = append(cands, filepath.Join(base, proj.Root, filepath.FromSlash(mod.Name)))
+	}
+	if strings.ContainsAny(root, `/\`) {
+		// 再退一步：该 root 可能是相对【代码根】写的
+		cands = append(cands, filepath.Join(base, filepath.FromSlash(root)))
+	}
+	for _, c := range cands {
+		if dirExists(c) {
+			return c
+		}
+	}
+	return primary
 }
 
 // ───────── zip / unzip ─────────

@@ -171,21 +171,25 @@ func DiscoverProjects(codeRoot string, maxDepth int) ([]DiscoveredProject, []str
 				proj.Modules = append(proj.Modules, DiscoveredModule{
 					Name:   filepath.Base(modDir),
 					Type:   "backend",
-					Root:   filepath.ToSlash(mustRel(codeRoot, modDir)),
+					// Root 的语义是【相对项目根】——不是相对代码根。
+					// 写成相对代码根会让下游拼出 wic-sh/wic-sh/wic-admin 这种重复路径
+					// （实测预检就是这样抓到的）。
+					Root:   filepath.ToSlash(mustRel(root, modDir)),
 					Output: sanitizeBackendOutput(filepath.Base(modDir)),
 				})
 			}
 		} else {
+			// 单模块项目：模块目录就是项目根自身
 			proj.Modules = append(proj.Modules, DiscoveredModule{
 				Name:   filepath.Base(root),
 				Type:   "backend",
-				Root:   filepath.ToSlash(relRoot),
+				Root:   ".",
 				Output: sanitizeBackendOutput(filepath.Base(root)),
 			})
 		}
 
 		// 前端模块：项目根下 ≤2 层找 package.json
-		proj.Modules = append(proj.Modules, discoverFrontends(codeRoot, root, &proj)...)
+		proj.Modules = append(proj.Modules, discoverFrontends(root, &proj)...)
 
 		// 统计与时间戳（供列表排序与筛选）
 		for _, m := range proj.Modules {
@@ -215,7 +219,9 @@ func DiscoverProjects(codeRoot string, maxDepth int) ([]DiscoveredProject, []str
 }
 
 // discoverFrontends 在项目根下找前端模块。
-func discoverFrontends(codeRoot, projectRoot string, proj *DiscoveredProject) []DiscoveredModule {
+//
+// 模块 Root 一律输出为【相对项目根】的路径。
+func discoverFrontends(projectRoot string, proj *DiscoveredProject) []DiscoveredModule {
 	var out []DiscoveredModule
 
 	_ = filepath.WalkDir(projectRoot, func(p string, d fs.DirEntry, err error) error {
@@ -257,7 +263,7 @@ func discoverFrontends(codeRoot, projectRoot string, proj *DiscoveredProject) []
 		mod := DiscoveredModule{
 			Name:   filepath.Base(dir),
 			Type:   "frontend",
-			Root:   filepath.ToSlash(mustRel(codeRoot, dir)),
+			Root:   filepath.ToSlash(mustRel(projectRoot, dir)),
 			Script: script,
 			Source: source,
 			Output: filepath.Base(dir),

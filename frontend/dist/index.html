@@ -6,159 +6,448 @@
 <title>Windows 助手</title>
 <style>
   :root {
-    --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --border:#2a2f3a;
-    --fg:#e6e8ec; --muted:#9aa1ad; --accent:#60a5fa; --accent-soft:#1e293b;
-    --danger:#f87171; --danger-soft:#3b1d1d; --warn:#fbbf24; --warn-soft:#3a2f10;
-    --ok:#34d399; --bar:linear-gradient(90deg,#2563eb,#3b82f6);
-    --rail:#12151b;
+    /* ── 表面：三层景深，带极轻微冷调，避免纯黑显得廉价 ── */
+    --bg: #0a0c11;
+    --surface-1: #11141b;
+    --surface-2: #161a23;
+    --surface-3: #1c2130;
+    --hairline: rgba(255, 255, 255, .07);
+    --hairline-2: rgba(255, 255, 255, .12);
+
+    /* ── 文字四级：靠层级而不是靠颜色数量撑起质感 ── */
+    --fg: #eef1f6;
+    --fg-2: #b9c0cd;
+    --fg-3: #7d858f;
+    --fg-4: #5a626d;
+
+    /* ── 强调色：克制到只用一个，另配一个近邻色做渐变 ── */
+    --accent: #5b9dff;
+    --accent-2: #8b7bff;
+    --accent-soft: rgba(91, 157, 255, .12);
+    --accent-line: rgba(91, 157, 255, .3);
+
+    --ok: #3ddc97;
+    --warn: #ffb84d;
+    --danger: #ff6b6b;
+    --ok-soft: rgba(61, 220, 151, .12);
+    --warn-soft: rgba(255, 184, 77, .10);
+    --danger-soft: rgba(255, 107, 107, .12);
+
+    --radius: 14px;
+    --radius-sm: 10px;
+    --radius-xs: 8px;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .35), 0 10px 28px -14px rgba(0, 0, 0, .6);
+    --shadow-2: 0 28px 70px -28px rgba(0, 0, 0, .8);
+    --ease: cubic-bezier(.2, .7, .3, 1);
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
   }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg);
-         font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
-  .app { display:flex; height:100vh; overflow:hidden; }
 
-  /* ── 左侧导航 ── */
-  .rail { width:64px; background:var(--rail); border-right:1px solid var(--border);
-          display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:4px; flex:none; }
-  .rail .logo { font-size:20px; margin-bottom:8px; }
-  .rail button { appearance:none; background:none; border:0; color:var(--muted); cursor:pointer;
-                 width:48px; height:48px; border-radius:10px; font-size:19px; position:relative; }
-  .rail button:hover { background:var(--panel2); color:var(--fg); }
-  .rail button.on { background:var(--accent-soft); color:var(--accent); }
-  .rail button .tip { position:absolute; left:56px; top:50%; transform:translateY(-50%);
-                      background:var(--panel); border:1px solid var(--border); border-radius:6px;
-                      padding:3px 8px; font-size:12px; color:var(--fg); white-space:nowrap;
-                      display:none; z-index:50; }
-  .rail button:hover .tip { display:block; }
-  .rail .sp { flex:1; }
-  .rail .boot { writing-mode:vertical-rl; color:var(--muted); font-size:10.5px; margin-bottom:8px; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  /* 环境光：两团极淡的色晕，让大片深色不至于死板 */
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(900px 520px at 12% -12%, rgba(91, 157, 255, .10), transparent 62%),
+      radial-gradient(760px 460px at 104% -6%, rgba(139, 123, 255, .08), transparent 58%);
+  }
 
-  /* ── 主区域 ── */
-  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
-  .head { padding:14px 20px 10px; border-bottom:1px solid var(--border); background:var(--panel);
-          display:flex; align-items:baseline; gap:12px; flex:none; }
-  .head h1 { font-size:16px; margin:0; }
-  .head .sub { color:var(--muted); font-size:12px; }
-  .content { flex:1; overflow:auto; padding:18px 22px; }
+  .mono { font-family: var(--mono); font-size: 12px; user-select: text; }
+  .muted { color: var(--fg-3); }
+  .hidden { display: none !important; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; }
-  .pad { padding:14px; }
-  .mono { font-family:ui-monospace,"Cascadia Mono",Consolas,monospace; font-size:12px; user-select:text; }
-  button { font:inherit; font-size:13.5px; color:var(--fg); background:var(--panel2);
-           border:1px solid var(--border); border-radius:7px; padding:8px 14px; cursor:pointer; }
-  button:hover { border-color:var(--accent); }
-  button.primary { background:var(--accent); border-color:var(--accent); color:#0b1220; font-weight:600; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
+  /* ── 骨架 ── */
+  .app { position: relative; z-index: 1; display: flex; height: 100vh; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* 顶栏：标题 + 副标题 + 右侧动作 */
+  .head {
+    flex: none; padding: 18px 26px 14px;
+    border-bottom: 1px solid var(--hairline);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .025), transparent);
+    display: flex; align-items: flex-end; gap: 14px;
+  }
+  .head h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .head .sub { color: var(--fg-3); font-size: 12.5px; padding-bottom: 1px; }
+  .head .spacer { flex: 1; }
+  .content { flex: 1; overflow: auto; padding: 22px 26px 28px; }
+
+  /* 左导航：细栏 + 图标 + 激活时的左侧光条 */
+  .rail {
+    flex: none; width: 66px; padding: 14px 0 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    border-right: 1px solid var(--hairline);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .022), rgba(255, 255, 255, 0) 40%);
+  }
+  .rail .logo {
+    width: 34px; height: 34px; margin-bottom: 10px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: linear-gradient(140deg, var(--accent), var(--accent-2));
+    box-shadow: 0 6px 18px -8px rgba(91, 157, 255, .9);
+    color: #08111f;
+  }
+  .rail .sp { flex: 1; }
+  .rail button {
+    position: relative; appearance: none; border: 0; background: none;
+    width: 44px; height: 44px; border-radius: var(--radius-sm); cursor: pointer;
+    display: grid; place-items: center; color: var(--fg-3);
+    transition: background .18s var(--ease), color .18s var(--ease), transform .18s var(--ease);
+  }
+  .rail button:hover { background: var(--surface-3); color: var(--fg); transform: translateY(-1px); }
+  .rail button.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); }
+  .rail button.on::before {
+    content: ''; position: absolute; left: -11px; top: 11px; bottom: 11px;
+    width: 2px; border-radius: 2px; background: var(--accent);
+    box-shadow: 0 0 10px 1px rgba(91, 157, 255, .8);
+  }
+  .rail button .tip {
+    position: absolute; left: 54px; top: 50%; transform: translateY(-50%) scale(.96);
+    background: var(--surface-2); border: 1px solid var(--hairline-2); border-radius: var(--radius-xs);
+    padding: 5px 10px; font-size: 12px; color: var(--fg); white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .16s var(--ease), transform .16s var(--ease);
+    box-shadow: var(--shadow-1); z-index: 60;
+  }
+  .rail button:hover .tip { opacity: 1; transform: translateY(-50%) scale(1); }
+  .rail .boot { writing-mode: vertical-rl; color: var(--fg-4); font-size: 10px; letter-spacing: .06em; margin-bottom: 10px; }
+  svg.ic { width: 19px; height: 19px; }
+
+  /* ── 卡片：发丝边 + 顶部内高光，做出"薄板"的层次 ── */
+  .card {
+    position: relative; background: var(--surface-1);
+    border: 1px solid var(--hairline); border-radius: var(--radius);
+    box-shadow: var(--shadow-1); overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; inset: 0 0 auto; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .10) 22%, rgba(255, 255, 255, .10) 78%, transparent);
+  }
+  .card + .card { margin-top: 16px; }
+  .pad { padding: 18px 20px; }
+  .card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; background: var(--surface-2);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .card-head .t { font-weight: 600; font-size: 13.5px; letter-spacing: -.005em; }
+  .card-head .d { color: var(--fg-3); font-size: 12px; font-weight: 400; }
+  .card-head .spacer { flex: 1; }
+  .card-foot {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; border-top: 1px solid var(--hairline); background: var(--surface-2);
+  }
+
+  /* ── 按钮 ── */
+  button {
+    font: inherit; font-size: 13px; font-weight: 500; color: var(--fg-2);
+    background: var(--surface-2); border: 1px solid var(--hairline-2);
+    border-radius: var(--radius-xs); padding: 8px 14px; cursor: pointer;
+    transition: background .16s var(--ease), border-color .16s var(--ease), color .16s var(--ease), transform .16s var(--ease);
+  }
+  button:hover { background: var(--surface-3); color: var(--fg); border-color: rgba(255, 255, 255, .18); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(91, 157, 255, .28); }
+  button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  button.primary {
+    background: linear-gradient(180deg, #6aa6ff, #4b86ee); color: #08111f;
+    font-weight: 600; border-color: transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 8px 20px -10px rgba(91, 157, 255, .95);
+  }
+  button.primary:hover { filter: brightness(1.07); color: #08111f; }
+  button.ghost { background: transparent; border-color: var(--hairline); }
+  button.ghost:hover { background: var(--surface-2); }
+  button.sm { padding: 5px 10px; font-size: 12px; border-radius: 7px; }
+
+  /* ── 表单 ── */
   select, input[type=text], input[type=password], input[type=search] {
-    font:inherit; font-size:13.5px; color:var(--fg); background:var(--panel2);
-    border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
-  label.chk { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:13px; cursor:pointer; }
-  .muted { color:var(--muted); }
-  .hidden { display:none !important; }
+    font: inherit; font-size: 13px; color: var(--fg);
+    background: #0c0f15; border: 1px solid var(--hairline-2);
+    border-radius: var(--radius-xs); padding: 9px 11px; width: auto;
+    transition: border-color .16s var(--ease), box-shadow .16s var(--ease), background .16s var(--ease);
+  }
+  select:hover, input:hover { border-color: rgba(255, 255, 255, .18); }
+  select:focus, input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(91, 157, 255, .18); background: #0a0d13;
+  }
+  input::placeholder { color: var(--fg-4); }
+  label.chk { display: flex; align-items: center; gap: 7px; color: var(--fg-2); font-size: 13px; cursor: pointer; }
+  input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
 
-  .banner { border-radius:10px; padding:11px 14px; margin-bottom:14px;
-            border:1px solid var(--border); background:var(--panel); }
-  .banner.warn { background:var(--warn-soft); }
-  .banner .t { font-weight:600; margin-bottom:5px; color:var(--warn); font-size:13px; }
-  .banner ul { margin:0; padding-left:18px; }
-  .banner li { margin:2px 0; font-size:12.5px; }
+  /* 表单行：标签在左、控件在右、下方可带提示 */
+  .form { display: grid; gap: 2px 18px; grid-template-columns: 150px 1fr; align-items: center; }
+  .form > label { color: var(--fg-3); font-size: 12.5px; padding: 10px 0; }
+  .form > .cell { padding: 6px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .form > .wide { grid-column: 1 / -1; }
+  .hint { color: var(--fg-4); font-size: 11.5px; }
 
-  /* ── 聊天页 ── */
-  .chatwrap { display:flex; flex-direction:column; height:100%; }
-  .msgs { flex:1; overflow:auto; padding:4px 2px 12px; }
-  .msg { margin:10px 0; display:flex; }
-  .msg.me { justify-content:flex-end; }
-  .bubble { max-width:78%; padding:9px 13px; border-radius:12px; white-space:pre-wrap;
-            word-break:break-word; font-size:13.5px; }
-  .msg.ai .bubble { background:var(--panel); border:1px solid var(--border); user-select:text; }
-  .msg.me .bubble { background:var(--accent-soft); border:1px solid var(--border); }
-  .msg.sys { justify-content:center; }
-  .msg.sys .bubble { background:none; border:0; color:var(--muted); font-size:12.5px; }
-  .bubble.thinking { color:var(--muted); }
-  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
-  .chip { font-size:12.5px; padding:5px 12px; border-radius:999px; }
-  .inputrow { display:flex; gap:8px; padding-top:10px; border-top:1px solid var(--border); }
-  .inputrow textarea { flex:1; resize:none; font:inherit; font-size:13.5px; color:var(--fg);
-                       background:var(--panel2); border:1px solid var(--border); border-radius:8px;
-                       padding:9px 12px; min-height:44px; max-height:140px; }
+  /* ── 步骤条（配置向导） ── */
+  .stepper { display: flex; align-items: center; padding: 6px 2px 0; }
+  .stepper .step {
+    display: flex; align-items: center; gap: 9px; padding: 7px 14px 7px 10px;
+    border-radius: 999px; cursor: pointer; border: 1px solid transparent;
+    transition: background .18s var(--ease), border-color .18s var(--ease);
+  }
+  .stepper .step:hover { background: var(--surface-2); }
+  .stepper .step .n {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 12px; font-weight: 600; color: var(--fg-4);
+    border: 1px solid var(--hairline-2); background: var(--surface-2);
+    transition: all .18s var(--ease);
+  }
+  .stepper .step .label { font-size: 13px; color: var(--fg-3); white-space: nowrap; }
+  .stepper .step.on { background: var(--accent-soft); border-color: var(--accent-line); }
+  .stepper .step.on .n {
+    background: linear-gradient(180deg, #6aa6ff, #4b86ee); color: #08111f; border-color: transparent;
+    box-shadow: 0 0 0 4px rgba(91, 157, 255, .16);
+  }
+  .stepper .step.on .label { color: var(--fg); font-weight: 600; }
+  .stepper .step.done .n { background: var(--ok-soft); color: var(--ok); border-color: rgba(61, 220, 151, .38); }
+  .stepper .step.done .label { color: var(--fg-2); }
+  .stepper .link { flex: 1; height: 1px; background: var(--hairline); min-width: 20px; }
 
-  /* ── 表格/卡片（扫描页） ── */
-  .cards { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); margin:16px 0; }
-  .stat .k { color:var(--muted); font-size:12px; }
-  .stat .v { font-size:21px; font-weight:650; margin-top:2px; letter-spacing:-.02em; }
-  .stat .s { color:var(--muted); font-size:12px; margin-top:2px; }
-  .card.crit .v { color:var(--danger); }
-  .ctrl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px; }
-  .progress { height:8px; border-radius:5px; background:var(--border); overflow:hidden; margin-top:12px; }
-  .progress > i { display:block; height:100%; width:0; background:var(--bar); transition:width .25s; }
-  .progress.indeterminate > i { width:35% !important; animation:slide 1.2s ease-in-out infinite; }
-  @keyframes slide { 0%{margin-left:-35%} 100%{margin-left:100%} }
-  .pline { color:var(--muted); font-size:12.5px; margin-top:7px; min-height:18px;
-           display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .pline .cur { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; }
-  .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); padding:0 8px;
-          background:var(--panel2); flex-wrap:wrap; align-items:center;
-          border-radius:10px 10px 0 0; }
-  .tabs button.t { appearance:none; background:none; border:0; border-bottom:2px solid transparent;
-                   color:var(--muted); padding:11px 12px; cursor:pointer; font:inherit; font-size:13.5px; }
-  .tabs button.t.on { color:var(--accent); border-bottom-color:var(--accent); }
-  .tabs .sp { flex:1; }
-  .bodybox { max-height:520px; overflow:auto; }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  thead th { position:sticky; top:0; background:var(--panel2); text-align:left; font-weight:600;
-             font-size:12px; color:var(--muted); padding:9px 12px; border-bottom:1px solid var(--border);
-             white-space:nowrap; cursor:pointer; user-select:none; z-index:1; }
-  th.num, td.num { text-align:right; font-variant-numeric:tabular-nums; }
-  tbody td { padding:7px 12px; border-bottom:1px solid var(--border); }
-  tbody tr:hover { background:var(--panel2); }
-  td.path { word-break:break-all; }
-  .badge { display:inline-block; font-size:11px; padding:1px 6px; border-radius:999px; margin-left:6px; }
-  .b-link { background:var(--accent-soft); color:var(--accent); }
-  .b-sum  { background:var(--border); color:var(--muted); }
-  .b-warn { background:var(--danger-soft); color:var(--danger); }
-  .kv { padding:4px 16px 14px; }
-  .kv div { display:flex; gap:16px; padding:7px 0; border-bottom:1px solid var(--border); }
-  .kv div:last-child { border-bottom:0; }
-  .kv b { flex:0 0 190px; font-weight:500; color:var(--muted); }
-  .kv span { flex:1; white-space:pre-wrap; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; user-select:text; }
-  .note { color:var(--muted); font-size:12.5px; padding:12px 16px; border-top:1px solid var(--border); }
-  .empty { padding:56px 20px; text-align:center; color:var(--muted); }
-  .empty .big { font-size:15px; color:var(--fg); margin-bottom:6px; }
+  /* ── 徽标 / 药丸 ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px;
+    background: var(--surface-3); color: var(--fg-3); border: 1px solid var(--hairline);
+    white-space: nowrap;
+  }
+  .b-link { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+  .b-sum { background: var(--surface-3); color: var(--fg-3); }
+  .b-warn { background: var(--warn-soft); color: var(--warn); border-color: rgba(255, 184, 77, .3); }
+  .b-ok { background: var(--ok-soft); color: var(--ok); border-color: rgba(61, 220, 151, .3); }
+  .b-danger { background: var(--danger-soft); color: var(--danger); border-color: rgba(255, 107, 107, .3); }
 
-  /* ── 设置页 ── */
-  .form { display:grid; gap:10px; grid-template-columns:150px 1fr; align-items:center; margin:6px 0; }
-  .form label { color:var(--muted); font-size:13px; }
-  .form .wide { grid-column:1 / -1; }
-  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .modlist { margin-top:10px; }
-  .modrow { display:flex; align-items:center; gap:12px; padding:9px 4px; border-bottom:1px solid var(--border); }
-  .modrow:last-child { border-bottom:0; }
-  .modrow .n { flex:1; }
-  .modrow .n b { font-weight:600; }
-  .modrow .n .d { color:var(--muted); font-size:12px; }
-  footer { color:var(--muted); font-size:12px; padding:12px 20px; border-top:1px solid var(--border);
-           display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; flex:none;
-           background:var(--panel); }
-  .toast { position:fixed; right:18px; bottom:18px; background:var(--panel); border:1px solid var(--border);
-           border-radius:10px; padding:10px 14px; font-size:12.5px; max-width:440px;
-           box-shadow:0 8px 30px rgba(0,0,0,.4); z-index:99; }
-  .page { display:none; flex:1; flex-direction:column; overflow:hidden; }
-  .page.on { display:flex; }
+  /* ── 提示条 ── */
+  .banner {
+    border: 1px solid var(--hairline); background: var(--surface-1);
+    border-radius: var(--radius); padding: 13px 16px; margin-bottom: 14px;
+  }
+  .banner.warn { background: var(--warn-soft); border-color: rgba(255, 184, 77, .28); }
+  .banner .t { font-weight: 600; margin-bottom: 5px; color: var(--warn); font-size: 13px; display: flex; align-items: center; gap: 7px; }
+  .banner ul { margin: 0; padding-left: 18px; }
+  .banner li { margin: 3px 0; font-size: 12.5px; color: var(--fg-2); }
+
+  /* ── 进度 ── */
+  .progress { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+  .progress > i {
+    display: block; height: 100%; width: 0; border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    box-shadow: 0 0 12px rgba(91, 157, 255, .6);
+    transition: width .3s var(--ease);
+  }
+  .progress.indeterminate > i { width: 34% !important; animation: slide 1.3s var(--ease) infinite; }
+  @keyframes slide { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
+  .pline { color: var(--fg-3); font-size: 12px; margin-top: 8px; display: flex; justify-content: space-between; gap: 12px; }
+  .pline .cur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+
+  /* ── 页签 ── */
+  .tabs {
+    display: flex; align-items: center; gap: 2px; padding: 0 8px;
+    background: var(--surface-2); border-bottom: 1px solid var(--hairline);
+  }
+  .tabs button.t {
+    appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
+    color: var(--fg-3); padding: 12px 13px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 500;
+    border-radius: 0; transition: color .16s var(--ease);
+  }
+  .tabs button.t:hover { background: none; color: var(--fg-2); transform: none; }
+  .tabs button.t.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .tabs .sp { flex: 1; }
+  .tabs input { margin: 7px 0; }
+
+  /* 分段控件（页签的另一形态：药丸） */
+  .segment {
+    display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--hairline);
+  }
+  .segment button {
+    appearance: none; border: 0; background: none; border-radius: 999px;
+    padding: 7px 16px; font-size: 13px; color: var(--fg-3); cursor: pointer;
+  }
+  .segment button:hover { background: var(--surface-3); color: var(--fg-2); transform: none; }
+  .segment button.on {
+    background: linear-gradient(180deg, #6aa6ff, #4b86ee); color: #08111f; font-weight: 600;
+    box-shadow: 0 6px 16px -10px rgba(91, 157, 255, .95);
+  }
+
+  /* ── 表格 ── */
+  .bodybox { max-height: 520px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    position: sticky; top: 0; z-index: 1; background: var(--surface-2);
+    text-align: left; font-weight: 600; font-size: 11.5px; letter-spacing: .02em;
+    text-transform: uppercase; color: var(--fg-4);
+    padding: 10px 14px; border-bottom: 1px solid var(--hairline); white-space: nowrap;
+    cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--fg-2); }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--hairline); color: var(--fg-2); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--surface-2); color: var(--fg); }
+  td.path { word-break: break-all; font-family: var(--mono); font-size: 12px; }
+  .cellbar { position: relative; min-width: 110px; }
+  .cellbar > i { display: block; height: 16px; border-radius: 4px; background: var(--accent-soft); min-width: 2px; }
+  .cellbar > span { position: absolute; left: 7px; top: 0; line-height: 16px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+  /* ── 键值列表 ── */
+  .kv { padding: 6px 20px 16px; }
+  .kv > div { display: flex; gap: 18px; padding: 9px 0; border-bottom: 1px solid var(--hairline); }
+  .kv > div:last-child { border-bottom: 0; }
+  .kv b { flex: 0 0 190px; font-weight: 500; color: var(--fg-3); font-size: 12.5px; }
+  .kv span { flex: 1; white-space: pre-wrap; font-family: var(--mono); font-size: 12px; color: var(--fg-2); user-select: text; }
+
+  /* ── 列表行（项目 / 模块 / 配置项） ── */
+  .modrow, .listrow {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; border-radius: var(--radius-sm);
+    border: 1px solid transparent; transition: background .16s var(--ease), border-color .16s var(--ease);
+  }
+  .listrow + .listrow { margin-top: 2px; }
+  .listrow[data-clickable] { cursor: pointer; }
+  .listrow[data-clickable]:hover { background: var(--surface-2); border-color: var(--hairline-2); }
+  .listrow.sel { background: var(--accent-soft); border-color: var(--accent-line); }
+  .listrow .n { flex: 1; min-width: 0; }
+  .listrow .n b { font-weight: 600; font-size: 13.5px; }
+  .listrow .n .d { color: var(--fg-3); font-size: 12px; }
+  .modrow { border-bottom: 1px solid var(--hairline); border-radius: 0; padding: 12px 2px; }
+  .modrow:last-child { border-bottom: 0; }
+  .modrow .n { flex: 1; }
+  .modrow .n b { font-weight: 600; }
+  .modrow .n .d { color: var(--fg-3); font-size: 12px; }
+
+  /* ── 统计卡 ── */
+  .cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin: 16px 0; }
+  .stat .k { color: var(--fg-3); font-size: 12px; }
+  .stat .v { font-size: 23px; font-weight: 650; margin-top: 3px; letter-spacing: -.025em; }
+  .stat .s { color: var(--fg-4); font-size: 12px; margin-top: 3px; }
+  .card.crit .v { color: var(--danger); }
+  .card.crit { border-color: rgba(255, 107, 107, .3); }
+
+  /* ── 大号选择区（选目录这类主操作） ── */
+  .dropzone {
+    border: 1px dashed var(--hairline-2); border-radius: var(--radius);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .022), transparent);
+    padding: 22px; text-align: center; transition: border-color .18s var(--ease), background .18s var(--ease);
+  }
+  .dropzone:hover { border-color: var(--accent-line); background: var(--accent-soft); }
+  .dropzone .big { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .dropzone .s { color: var(--fg-3); font-size: 12.5px; margin-bottom: 14px; }
+  .pathchip {
+    display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px;
+    border-radius: 999px; background: var(--surface-2); border: 1px solid var(--hairline-2);
+    font-family: var(--mono); font-size: 12px; color: var(--fg-2); max-width: 100%;
+  }
+  .pathchip .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── 预检清单 ── */
+  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--hairline); }
+  .check-item:last-child { border-bottom: 0; }
+  .check-item .mk { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; flex: none; margin-top: 1px; }
+  .check-item .mk.ok { background: var(--ok-soft); color: var(--ok); }
+  .check-item .mk.bad { background: var(--danger-soft); color: var(--danger); }
+  .check-item .nm { flex: 0 0 132px; color: var(--fg-3); font-size: 12.5px; }
+  .check-item .dt { flex: 1; font-family: var(--mono); font-size: 12px; color: var(--fg-2); word-break: break-all; }
+  .check-item .fix { padding: 2px 0 10px 160px; color: var(--warn); font-size: 12px; }
+
+  /* ── 空状态 ── */
+  .empty { padding: 60px 24px; text-align: center; color: var(--fg-3); }
+  .empty .mark {
+    width: 52px; height: 52px; margin: 0 auto 16px; border-radius: 16px;
+    display: grid; place-items: center; color: var(--accent);
+    background: var(--accent-soft); border: 1px solid var(--accent-line);
+  }
+  .empty .big { font-size: 15px; font-weight: 600; color: var(--fg); margin-bottom: 6px; }
+  .empty .s { font-size: 12.5px; }
+
+  /* ── 聊天气泡 ── */
+  .chatwrap { display: flex; flex-direction: column; height: 100%; }
+  .msgs { flex: 1; overflow: auto; padding: 4px 2px 12px; }
+  .msg { margin: 12px 0; display: flex; }
+  .msg.me { justify-content: flex-end; }
+  .bubble {
+    max-width: 78%; padding: 10px 14px; border-radius: 14px; font-size: 13.5px;
+    white-space: pre-wrap; word-break: break-word; border: 1px solid var(--hairline);
+  }
+  .msg.ai .bubble { background: var(--surface-1); user-select: text; border-top-left-radius: 5px; box-shadow: var(--shadow-1); }
+  .msg.me .bubble {
+    background: linear-gradient(180deg, rgba(91, 157, 255, .22), rgba(91, 157, 255, .14));
+    border-color: var(--accent-line); border-top-right-radius: 5px;
+  }
+  .msg.sys { justify-content: center; }
+  .msg.sys .bubble { background: none; border: 0; color: var(--fg-3); font-size: 12.5px; }
+  .bubble.thinking { color: var(--fg-3); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+  .chip { font-size: 12.5px; padding: 6px 13px; border-radius: 999px; }
+  .inputrow { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+  .inputrow textarea {
+    flex: 1; resize: none; font: inherit; font-size: 13.5px; color: var(--fg);
+    background: #0c0f15; border: 1px solid var(--hairline-2); border-radius: var(--radius-sm);
+    padding: 11px 13px; min-height: 46px; max-height: 150px;
+    transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
+  }
+  .inputrow textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91, 157, 255, .18); }
+
+  /* ── 扫描控制区 ── */
+  .ctrl { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 18px 20px; }
+
+  /* ── 页脚 ── */
+  footer {
+    flex: none; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 26px; color: var(--fg-4); font-size: 11.5px;
+    border-top: 1px solid var(--hairline); background: rgba(0, 0, 0, .18);
+  }
+
+  /* ── 提示 ── */
+  .toast {
+    position: fixed; right: 20px; bottom: 20px; z-index: 99; max-width: 460px;
+    background: var(--surface-2); border: 1px solid var(--hairline-2); border-radius: var(--radius-sm);
+    padding: 12px 16px; font-size: 12.5px; color: var(--fg);
+    box-shadow: var(--shadow-2); animation: toastin .22s var(--ease);
+  }
+  @keyframes toastin { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+
+  /* ── 页面容器 ── */
+  .page { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .page.on { display: flex; animation: pagein .22s var(--ease); }
+  @keyframes pagein { from { opacity: 0; transform: translateY(6px); } }
+
+  /* 步骤内容切换的进场 */
+  .stepbody { animation: pagein .2s var(--ease); }
+
+  /* 滚动条：细、无箭头、hover 才显色 */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .09); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .18); background-clip: content-box; }
 </style>
 </head>
 <body>
 <div class="app">
   <nav class="rail">
-    <div class="logo">🪟</div>
+    <div class="logo" title="Windows 助手">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px">
+        <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/>
+      </svg>
+    </div>
     <div id="rail"></div>
     <div class="sp"></div>
-    <div class="boot" id="bootms"></div>
-    <button id="btnSettings" title="设置">⚙️<span class="tip">设置</span></button>
+    <button id="btnSettings" title="设置"><span class="tip">设置</span></button>
   </nav>
   <div class="main">
     <div class="head">
       <h1 id="pageTitle">Windows 助手</h1>
       <span class="sub" id="pageSub"></span>
+      <span class="spacer"></span>
+      <span class="badge" id="bootms"></span>
     </div>
     <div class="content">
 
@@ -210,148 +499,171 @@
         </div></div>
       </div>
 
-            <!-- 部署打包页：打包与配置分离（默认停在「打包」） -->
+                  <!-- 部署打包页：打包与配置分离（默认停在「打包」） -->
       <div class="page" id="page-deploy">
-        <div class="tabs" style="border-radius:10px;border:1px solid var(--border);margin-bottom:14px">
-          <button class="t on" data-dtab="run">打包</button>
-          <button class="t" data-dtab="config">配置</button>
-          <div class="sp"></div>
-          <span class="muted" id="dpTabHint" style="align-self:center;padding-right:12px;font-size:12px"></span>
+        <div class="row" style="justify-content:space-between;margin-bottom:18px">
+          <div class="segment">
+            <button data-dtab="run" class="on">打包</button>
+            <button data-dtab="config">配置</button>
+          </div>
+          <span class="hint" id="dpTabHint"></span>
         </div>
 
-        <!-- ────────── 打包页：只回答「现在能不能打」「点了会产出什么」 ────────── -->
+        <!-- ────────── 打包页 ────────── -->
         <div id="dtab-run">
           <div class="card hidden" id="dpNotReady">
             <div class="empty">
+              <div class="mark">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:24px;height:24px">
+                  <path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>
+                </svg>
+              </div>
               <div class="big">还没有配置打包项目</div>
-              <div>三步搞定：选代码目录 → 确认模块 → 选输出目录。<br>
+              <div class="s">三步搞定：选代码目录 → 确认模块 → 选输出目录。<br>
                 JDK 与 Maven 会自动探测，不需要手填路径。</div>
-              <div style="margin-top:16px"><button class="primary" id="dpGotoConfig">开始配置</button></div>
+              <div style="margin-top:18px"><button class="primary" id="dpGotoConfig">开始配置</button></div>
             </div>
           </div>
 
           <div id="dpReady" class="hidden">
             <div class="card">
-              <div class="pad">
-                <div class="row" style="justify-content:space-between">
-                  <b>预检</b>
-                  <span class="muted" id="dpCheckSummary" style="font-size:12.5px"></span>
-                  <span style="flex:1"></span>
-                  <button id="dpRecheck">重新检查</button>
-                </div>
-                <div id="dpChecks" style="margin-top:10px"></div>
+              <div class="card-head">
+                <span class="t">预检</span>
+                <span class="d">打包前把条件查一遍，避免跑到一半才失败</span>
+                <span class="spacer"></span>
+                <span id="dpCheckSummary"></span>
+                <button class="sm ghost" id="dpRecheck">重新检查</button>
               </div>
+              <div class="pad" id="dpChecks" style="padding-top:6px"></div>
             </div>
 
-            <div class="card" style="margin-top:14px">
-              <div class="pad">
-                <b>本次将产出</b>
-                <div id="dpPlanned" style="margin-top:8px"></div>
+            <div class="card">
+              <div class="card-head">
+                <span class="t">本次将产出</span>
+                <span class="d">点之前就知道会得到什么</span>
               </div>
+              <div class="pad" id="dpPlanned" style="padding-top:6px"></div>
             </div>
 
-            <div class="card" style="margin-top:14px">
+            <div class="card">
+              <div class="card-head">
+                <span class="t">执行</span>
+                <span class="spacer"></span>
+                <span class="hint" id="dpPhase"></span>
+              </div>
               <div class="pad">
                 <div class="row" style="gap:10px">
                   <button class="primary" id="dpStart">开始打包</button>
                   <button id="dpCancel" class="hidden">取消</button>
-                  <button id="dpOpenOut2">打开输出目录</button>
-                  <span class="muted" id="dpPhase" style="font-size:12.5px"></span>
+                  <span class="spacer" style="flex:1"></span>
+                  <button class="ghost" id="dpOpenOut2">打开输出目录</button>
                 </div>
-                <div class="progress" id="dpBar" style="margin-top:10px"><i></i></div>
+                <div class="progress" id="dpBar" style="margin-top:14px"><i></i></div>
               </div>
-              <div id="dpLogs" style="max-height:320px;overflow:auto;padding:10px 14px;border-top:1px solid var(--border);
-                   font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.5"></div>
+              <div id="dpLogs" style="max-height:340px;overflow:auto;padding:12px 20px;border-top:1px solid var(--hairline);
+                   background:#080a0e;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;
+                   line-height:1.65;color:var(--fg-2)"></div>
             </div>
           </div>
         </div>
 
-        <!-- ────────── 配置页：三步向导（一次性） ────────── -->
+        <!-- ────────── 配置页：三步向导 ────────── -->
         <div id="dtab-config" class="hidden">
-          <div class="row" id="dpSteps" style="gap:8px;margin-bottom:12px"></div>
+          <div class="stepper" id="dpSteps" style="margin-bottom:18px"></div>
 
           <!-- 第 1 步 -->
-          <div class="card" id="dpStep1">
+          <div class="card stepbody" id="dpStep1">
+            <div class="card-head">
+              <span class="t">代码放哪？</span>
+              <span class="d">选一个根目录，自动扫描出里面的 Maven / 前端项目</span>
+            </div>
             <div class="pad">
-              <b>第 1 步：代码放哪？</b>
-              <div class="muted" style="font-size:12.5px;margin:4px 0 12px">
-                选一个代码根目录，程序会自动扫描出里面的 Maven / 前端项目，不用手抄模块清单。
+              <div class="dropzone" id="dpDropBase">
+                <div class="big">选择代码根目录</div>
+                <div class="s">扫描是只读的，不会改动任何源码</div>
+                <div class="row" style="justify-content:center;gap:10px">
+                  <button class="primary" id="dpPickBase">浏览目录…</button>
+                  <button class="ghost" id="dpScan">扫描此目录</button>
+                </div>
+                <div class="row" id="dpBaseCands" style="justify-content:center;gap:8px;margin-top:14px"></div>
               </div>
-              <div class="row" style="gap:8px">
-                <input type="text" id="dpBase" style="flex:1;min-width:320px" placeholder="例如 D:\code">
-                <button id="dpPickBase">选择…</button>
-                <button class="primary" id="dpScan">扫描</button>
+
+              <div class="row" style="margin-top:14px;gap:10px">
+                <span class="hint">当前：</span>
+                <span class="pathchip"><span class="p" id="dpBaseShown">（未选择）</span></span>
               </div>
-              <div class="row" id="dpBaseCands" style="gap:8px;margin-top:10px"></div>
-              <div class="muted" id="dpScanNote" style="font-size:12.5px;margin-top:10px"></div>
+              <input type="hidden" id="dpBase">
+              <div class="hint" id="dpScanNote" style="margin-top:12px"></div>
             </div>
           </div>
 
           <!-- 第 2 步 -->
-          <div class="card hidden" id="dpStep2">
+          <div class="card hidden stepbody" id="dpStep2">
+            <div class="card-head">
+              <span class="t">打哪个项目？</span>
+              <span class="d" id="dpDiscCount"></span>
+            </div>
             <div class="pad">
-              <b>第 2 步：打哪个项目？</b>
-              <div class="muted" style="font-size:12.5px;margin:4px 0 10px">
-                按最近修改时间排序。选一个项目后确认它的模块。
-                <span id="dpDiscCount"></span>
-              </div>
-              <input type="search" id="dpProjFilter" placeholder="过滤项目名…" style="width:100%;margin-bottom:10px">
-              <div id="dpProjList" style="max-height:260px;overflow:auto"></div>
+              <input type="search" id="dpProjFilter" placeholder="过滤项目名…" style="width:100%">
+              <div id="dpProjList" style="max-height:280px;overflow:auto;margin-top:12px"></div>
 
-              <div id="dpModBox" class="hidden" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-                <div class="row" style="gap:8px">
-                  <b id="dpModTitle"></b>
-                  <span style="flex:1"></span>
-                  <button id="dpModAll">全选</button>
-                  <button id="dpModNone">全不选</button>
-                  <button id="dpModFe">只选前端</button>
+              <div id="dpModBox" class="hidden" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--hairline)">
+                <div class="row">
+                  <b id="dpModTitle" style="font-size:13.5px"></b>
+                  <span class="spacer" style="flex:1"></span>
+                  <button class="sm ghost" id="dpModAll">全选</button>
+                  <button class="sm ghost" id="dpModNone">全不选</button>
+                  <button class="sm ghost" id="dpModFe">只选前端</button>
                 </div>
-                <div id="dpModList" style="margin-top:8px"></div>
-                <div class="row" style="margin-top:12px">
-                  <button class="primary" id="dpAdopt">采用此项目</button>
-                  <span class="muted" id="dpAdoptNote" style="font-size:12.5px"></span>
-                </div>
+                <div id="dpModList" style="margin-top:10px"></div>
               </div>
 
-              <div id="dpCfgProjects" style="margin-top:14px"></div>
+              <div id="dpCfgProjects" style="margin-top:16px"></div>
+            </div>
+            <div class="card-foot">
+              <button class="primary" id="dpAdopt">采用此项目</button>
+              <span class="hint" id="dpAdoptNote"></span>
             </div>
           </div>
 
           <!-- 第 3 步 -->
-          <div class="card hidden" id="dpStep3">
+          <div class="card hidden stepbody" id="dpStep3">
+            <div class="card-head">
+              <span class="t">工具链与输出</span>
+              <span class="d">工具链已自动探测，通常直接下一步即可</span>
+              <span class="spacer"></span>
+              <button class="sm ghost" id="dpDetect">重新探测</button>
+            </div>
             <div class="pad">
-              <b>第 3 步：工具链与输出</b>
-              <div class="muted" style="font-size:12.5px;margin:4px 0 10px">
-                工具链已自动探测，通常直接下一步即可。
-              </div>
               <div class="form">
                 <label>JDK</label>
-                <div class="row" style="gap:8px">
-                  <select id="dpJDK" style="flex:1;min-width:340px"></select>
-                </div>
+                <div class="cell"><select id="dpJDK" style="flex:1;min-width:320px"></select></div>
+
                 <label>Maven</label>
-                <div class="row" style="gap:8px">
-                  <select id="dpMvn" style="flex:1;min-width:340px"></select>
-                </div>
-                <div class="wide row"><button id="dpDetect">重新探测</button>
-                  <span class="muted" id="dpDetectNote" style="font-size:12px"></span></div>
+                <div class="cell"><select id="dpMvn" style="flex:1;min-width:320px"></select></div>
+
+                <label></label>
+                <div class="cell"><span class="hint" id="dpDetectNote"></span></div>
 
                 <label>产物输出目录</label>
-                <div class="row" style="gap:8px">
-                  <input type="text" id="dpOut" style="flex:1;min-width:320px" placeholder="打包产物写到哪">
+                <div class="cell">
+                  <input type="text" id="dpOut" style="flex:1;min-width:300px" placeholder="打包产物写到哪（可随时更换）">
                   <button id="dpPickOut">选择…</button>
-                  <button id="dpOpenOut">打开</button>
+                  <button class="ghost" id="dpOpenOut">打开</button>
                 </div>
+
                 <label>保留环境</label>
-                <div class="row" style="gap:8px">
+                <div class="cell">
                   <input type="text" id="dpKeepEnv" style="width:120px" placeholder="prod">
-                  <span class="muted" style="font-size:12px">只保留 application-&lt;此值&gt;.yml，其余环境配置在产物中移除</span>
+                  <span class="hint">只保留 application-&lt;此值&gt;.yml，其余环境配置在产物中移除</span>
                 </div>
               </div>
-              <div class="row" style="margin-top:14px;gap:10px">
-                <button class="primary" id="dpFinish">完成，去打包</button>
-                <button id="dpImport">导入既有配置…</button>
-              </div>
+            </div>
+            <div class="card-foot">
+              <button class="primary" id="dpFinish">完成，去打包</button>
+              <button class="ghost" id="dpImport">导入既有配置…</button>
+              <span class="spacer" style="flex:1"></span>
+              <span class="hint">配置会自动保存</span>
             </div>
           </div>
         </div>
@@ -464,13 +776,31 @@ function toast(msg, warn) {
 }
 
 /* ───────── 导航 ───────── */
+// 内联矢量图标。用 SVG 而不是 emoji：emoji 在不同机器上形状/颜色不一，
+// 且无法跟随主题色，是界面显得廉价的主要来源。
+function svgIc(d, size) {
+  const s = size || 20;
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"'
+    + ' stroke-linecap="round" stroke-linejoin="round" style="width:' + s + 'px;height:' + s + 'px">' + d + '</svg>';
+}
+const ICONS = {
+  chat: '<path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5H7.6L3 23v-4.6A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.5 11.5h7"/>',
+  scan: '<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/>',
+  deploy: '<path d="M12 3 3 7.6v8.8L12 21l9-4.6V7.6L12 3Z"/><path d="M3 7.6 12 12l9-4.4M12 12v9"/>',
+  clean: '<path d="M9 3h6l1 6H8l1-6Z"/><path d="M8 9h8l-1 12H9L8 9Z"/><path d="M10 13h4"/>',
+  migrate: '<path d="M4 8h12"/><path d="m13 5 3 3-3 3"/><path d="M20 16H8"/><path d="m11 13-3 3 3 3"/>',
+  settings: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.2a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4Z"/>',
+  doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/>',
+  pane: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/>',
+};
+
 const PAGE_META = {
-  chat: { icon: '💬', name: 'AI 助手', sub: '与大模型对话；未配置大模型时也可使用下方本地快捷功能' },
-  scan: { icon: '🔍', name: '磁盘扫描', sub: '只读统计：看清每个盘的空间被什么占了' },
-  deploy: { icon: '📦', name: 'Java 打包部署', sub: '构建后端 war_exploded 与前端产物；工具链自动探测、输出目录可选' },
-  clean: { icon: '🧹', name: '垃圾清理', sub: '按可清理性分级判定（开发中）' },
-  migrate: { icon: '🗂️', name: '空间迁移', sub: '把庞然大物搬到其他盘（规划中）' },
-  settings: { icon: '⚙️', name: '设置', sub: '主页选择 · AI 接入 · 模块开关' },
+  chat: { icon: ICONS.chat, name: 'AI 助手', sub: '与大模型对话；未配置大模型时也可使用下方本地快捷功能' },
+  scan: { icon: ICONS.scan, name: '磁盘扫描', sub: '只读统计：看清每个盘的空间被什么占了' },
+  deploy: { icon: ICONS.deploy, name: 'Java 打包部署', sub: '构建后端 war_exploded 与前端产物；工具链自动探测、输出目录可选' },
+  clean: { icon: ICONS.clean, name: '垃圾清理', sub: '按可清理性分级判定（开发中）' },
+  migrate: { icon: ICONS.migrate, name: '空间迁移', sub: '把庞然大物搬到其他盘（规划中）' },
+  settings: { icon: ICONS.settings, name: '设置', sub: '主页选择 · AI 接入 · 模块开关' },
 };
 
 async function renderRail() {
@@ -507,14 +837,15 @@ async function renderRail() {
   rail.innerHTML = '';
   mods.forEach(m => {
     if (!m.enabled) return;   // 禁用的模块不出现在导航
-    const meta = PAGE_META[m.id] || { icon: m.icon || '📄', name: m.name, sub: m.desc };
+    const meta = PAGE_META[m.id] || { icon: ICONS.doc, name: m.name, sub: m.desc };
     const b = document.createElement('button');
     b.dataset.page = m.id;
-    b.innerHTML = `${meta.icon}<span class="tip">${esc(meta.name)}</span>`;
+    b.innerHTML = svgIc(meta.icon, 20) + `<span class="tip">${esc(meta.name)}</span>`;
     b.addEventListener('click', () => openPage(m.id));
     rail.appendChild(b);
   });
   // 设置按钮固定在底部
+  el('btnSettings').innerHTML = svgIc(ICONS.settings, 20) + '<span class="tip">设置</span>';
   el('btnSettings').onclick = () => openPage('settings');
 }
 
@@ -940,15 +1271,15 @@ async function initDeploy() {
   });
 
   // 页签
-  document.querySelectorAll('#page-deploy .tabs button[data-dtab]').forEach(b => {
+  document.querySelectorAll('#page-deploy .segment button[data-dtab]').forEach(b => {
     b.addEventListener('click', () => showDeployTab(b.dataset.dtab));
   });
   el('dpGotoConfig').addEventListener('click', () => { showDeployTab('config'); dpGotoStep(1); });
 
   // 第 1 步
   el('dpPickBase').addEventListener('click', async () => {
-    const d = await A().PickDirectory('选择代码根目录', el('dpBase').value);
-    if (d) { el('dpBase').value = d; await runScan(); }
+    const d = await A().PickDirectory('选择代码根目录', dpGetBase());
+    if (d) { dpSetBase(d); await runScan(); }
   });
   el('dpScan').addEventListener('click', runScan);
 
@@ -987,7 +1318,7 @@ async function initDeploy() {
   el('dpRecheck').addEventListener('click', runPrecheck);
   el('dpStart').addEventListener('click', startPack);
   el('dpCancel').addEventListener('click', () => A().CancelPack());
-  ['dpBase', 'dpOut', 'dpKeepEnv'].forEach(id => el(id).addEventListener('change', saveDeploy));
+  ['dpOut', 'dpKeepEnv'].forEach(id => el(id).addEventListener('change', saveDeploy));
 
   await refreshDeploy();
   await loadBaseCandidates();
@@ -996,7 +1327,7 @@ async function initDeploy() {
 
 function showDeployTab(tab) {
   dpTab = tab;
-  document.querySelectorAll('#page-deploy .tabs button[data-dtab]').forEach(b =>
+  document.querySelectorAll('#page-deploy .segment button[data-dtab]').forEach(b =>
     b.classList.toggle('on', b.dataset.dtab === tab));
   el('dtab-run').classList.toggle('hidden', tab !== 'run');
   el('dtab-config').classList.toggle('hidden', tab !== 'config');
@@ -1007,13 +1338,26 @@ function dpGotoStep(n) {
   renderSteps(n);
 }
 
+// 代码根目录用隐藏 input 存储、用 chip 展示——视觉上不放一个裸输入框
+function dpSetBase(v) {
+  el('dpBase').value = v || '';
+  el('dpBaseShown').textContent = v || '（未选择）';
+}
+function dpGetBase() { return el('dpBase').value.trim(); }
+
 function renderSteps(cur) {
   const names = ['代码目录', '项目与模块', '工具链与输出'];
-  el('dpSteps').innerHTML = names.map((n, i) => {
+  const parts = [];
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="m5 13 4 4 10-10"/></svg>';
+  names.forEach((n, i) => {
     const idx = i + 1;
-    const cls = idx === cur ? 'primary' : '';
-    return `<button class="${cls}" data-step="${idx}">${idx}. ${esc(n)}</button>`;
-  }).join('');
+    if (idx > 1) parts.push('<span class="link"></span>');
+    const cls = idx === cur ? 'on' : (idx < cur ? 'done' : '');
+    const mark = idx < cur ? CHECK : idx;
+    parts.push(`<div class="step ${cls}" data-step="${idx}">
+      <span class="n">${mark}</span><span class="label">${esc(n)}</span></div>`);
+  });
+  el('dpSteps').innerHTML = parts.join('');
   el('dpSteps').querySelectorAll('button[data-step]').forEach(b =>
     b.addEventListener('click', () => dpGotoStep(Number(b.dataset.step))));
 }
@@ -1028,14 +1372,14 @@ async function loadBaseCandidates() {
       : '';
     el('dpBaseCands').querySelectorAll('button[data-cand]').forEach(b =>
       b.addEventListener('click', async () => {
-        el('dpBase').value = b.dataset.cand;
+        dpSetBase(b.dataset.cand);
         await runScan();
       }));
   } catch (e) { /* 失败不影响主流程 */ }
 }
 
 async function runScan() {
-  const root = el('dpBase').value.trim();
+  const root = dpGetBase();
   if (!root) { toast('请先选择代码根目录', true); return; }
   el('dpScanNote').textContent = '正在扫描…';
   el('dpProjList').innerHTML = '';
@@ -1074,12 +1418,12 @@ function renderProjList() {
     const tags = [];
     if (p.backend_count) tags.push(`<span class="badge b-sum">后端 ${p.backend_count}</span>`);
     if (p.frontend_count) tags.push(`<span class="badge b-link">前端 ${p.frontend_count}</span>`);
-    return `<div class="modrow" data-proj="${esc(p.root)}" style="cursor:pointer">
+    return `<div class="listrow" data-proj="${esc(p.root)}" data-clickable>
       <div class="n"><b>${esc(p.name)}</b> <span class="muted mono" style="font-size:11.5px">${esc(p.root)}</span>
         <div class="d">${tags.join(' ')} ${p.note ? '<span style="color:var(--warn)">' + esc(p.note) + '</span>' : ''}</div>
       </div>
-      <span class="muted" style="font-size:11.5px">${when}</span>
-      <button>选择</button>
+      <span class="hint">${when}</span>
+      <span class="badge b-link">选择</span>
     </div>`;
   }).join('') || '<div class="muted">没有匹配的项目</div>';
 
@@ -1143,7 +1487,7 @@ async function runDetect(notify) {
   if (notify) noteEl.textContent = '探测中…';
   let res;
   try {
-    const roots = [el('dpBase').value.trim()].filter(Boolean);
+    const roots = [dpGetBase()].filter(Boolean);
     res = await A().DetectToolchain(roots);
   } catch (e) { noteEl.textContent = '探测失败: ' + e; return; }
 
@@ -1171,7 +1515,7 @@ async function refreshDeploy() {
   try { dto = await A().GetDeploy(); } catch (e) { toast(String(e), true); return; }
 
   const c = dto.config || {};
-  if (!el('dpBase').value) el('dpBase').value = c.base_path || '';
+  if (!dpGetBase()) dpSetBase(c.base_path || '');
   if (!el('dpOut').value) el('dpOut').value = c.output_dir || '';
   if (!el('dpKeepEnv').value) el('dpKeepEnv').value = c.keep_env || 'prod';
   el('dpTabHint').textContent = dto.summary || '';
@@ -1180,10 +1524,10 @@ async function refreshDeploy() {
   const projs = c.projects || [];
   el('dpCfgProjects').innerHTML = projs.length
     ? '<div class="muted" style="font-size:12px;margin-bottom:6px">已配置的项目：</div>' + projs.map(p =>
-      `<div class="modrow"><div class="n"><b>${esc(p.name)}</b>
+      `<div class="listrow"><div class="n"><b>${esc(p.name)}</b>
         <span class="muted mono" style="font-size:11.5px">${esc(p.root)}</span>
         <div class="d">${(p.modules || []).length} 个模块</div></div>
-        <button data-del="${esc(p.name)}">移除</button></div>`).join('')
+        <button class="sm ghost" data-del="${esc(p.name)}">移除</button></div>`).join('')
     : '';
   el('dpCfgProjects').querySelectorAll('button[data-del]').forEach(b =>
     b.addEventListener('click', async () => {
@@ -1222,14 +1566,15 @@ async function runPrecheck() {
   } catch (e) { toast(String(e), true); return; }
   dpChecks = res;
 
+  const OKM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px"><path d="m5 13 4 4 10-10"/></svg>';
+  const BADM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" style="width:11px;height:11px"><path d="M12 7v5.5"/><path d="M12 16.6v.4"/></svg>';
   el('dpChecks').innerHTML = (res.items || []).map(it => `
-    <div class="row" style="gap:8px;align-items:flex-start;padding:5px 0">
-      <span style="width:16px;color:${it.ok ? 'var(--ok)' : 'var(--danger)'}">${it.ok ? '✓' : '✗'}</span>
-      <span style="flex:0 0 130px;color:var(--muted);font-size:12.5px">${esc(it.name)}</span>
-      <span style="flex:1;font-size:12.5px" class="mono">${esc(it.detail)}</span>
+    <div class="check-item">
+      <span class="mk ${it.ok ? 'ok' : 'bad'}">${it.ok ? OKM : BADM}</span>
+      <span class="nm">${esc(it.name)}</span>
+      <span class="dt">${esc(it.detail)}</span>
     </div>
-    ${!it.ok && it.fix ? `<div class="row" style="padding:0 0 6px 154px">
-      <span style="font-size:12px;color:var(--warn)">→ ${esc(it.fix)}</span></div>` : ''}
+    ${!it.ok && it.fix ? `<div class="fix">→ ${esc(it.fix)}</div>` : ''}
   `).join('');
 
   const bad = (res.items || []).filter(i => i.critical && !i.ok).length;
@@ -1239,10 +1584,11 @@ async function runPrecheck() {
   el('dpTabHint').textContent = bad === 0 ? '预检通过，可以打包' : `${bad} 项待修复`;
 
   el('dpPlanned').innerHTML = (res.planned || []).map(p =>
-    `<div class="row" style="gap:8px;padding:4px 0;font-size:12.5px">
+    `<div class="listrow">
       <span class="badge ${p.type === 'frontend' ? 'b-link' : 'b-sum'}">${esc(p.type)}</span>
-      <span class="mono" style="flex:1">${esc(p.path)}</span></div>`).join('')
-    || '<div class="muted" style="font-size:12.5px">—</div>';
+      <span class="mono" style="flex:1;word-break:break-all">${esc(p.path)}</span>
+      <span class="hint">${esc(p.module)}</span></div>`).join('')
+    || '<div class="hint">—</div>';
 
   el('dpStart').disabled = !res.ok;
   if (!res.ok) {
@@ -1260,7 +1606,7 @@ async function saveDeploy() {
   try {
     const dto = await A().GetDeploy();
     const cfg = dto.config;
-    cfg.base_path = el('dpBase').value.trim();
+    cfg.base_path = dpGetBase();
     cfg.output_dir = el('dpOut').value.trim();
     cfg.keep_env = el('dpKeepEnv').value.trim() || 'prod';
     cfg.jdk_path = dpSelected('dpJDK');

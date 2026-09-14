@@ -206,11 +206,7 @@ func Precheck(cfg Config, opts RunOptions) PrecheckResult {
 		if t == "" {
 			t = "backend"
 		}
-		root := mod.Root
-		if root == "" {
-			root = mod.Name
-		}
-		modDir := filepath.Join(base, j.proj.Root, filepath.FromSlash(root))
+		modDir := resolveModuleDir(base, j.proj, mod)
 		label := j.proj.Name + "/" + mod.Name
 
 		if !dirExists(modDir) {
