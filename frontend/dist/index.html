@@ -379,6 +379,12 @@ function markActive(page) {
 async function openPage(id) {
   if (id === curPage) return;
 
+  // 进入设置/聊天页前先重读配置：用户可能手改了 config.yaml，
+  // 或刚在设置页保存了 AI 配置——聊天页的「未配置」提示必须以最新配置为准
+  if (id === 'chat' || id === 'settings') {
+    try { await A().RefreshConfig(); } catch (e) { console.warn(e); }
+  }
+
   // 进入模块页前先走懒加载入口（首次会触发该模块的初始化钩子）
   if (id !== 'settings') {
     try {
@@ -442,14 +448,26 @@ async function initChat() {
     box.appendChild(b);
   });
 
-  await refreshChatConfigured();
-  if (chatConfigured === false) showChatSetup();
+  await refreshChatState();
 }
 
-async function refreshChatConfigured() {
+// refreshChatState 按最新配置刷新聊天页的「未配置」横幅。
+//
+// 每次进入聊天页都要调用（openPage 已先 RefreshConfig 重读磁盘配置）：
+// 之前只在首次 initChat 判断一次，用户在设置页配好大模型后切回来，
+// 横幅还挂着旧状态——这正是「配置了大模型为啥还提示」的原因。
+async function refreshChatState() {
   const s = await A().GetSettings();
   chatConfigured = s.ai.configured;
-  return s;
+  const box = el('chatSetup');
+  if (chatConfigured) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+  } else {
+    box.classList.remove('hidden');
+    showChatSetup();
+  }
+  return chatConfigured;
 }
 
 function showChatSetup() {
@@ -492,11 +510,15 @@ async function sendChat() {
   const text = inp.value.trim();
   if (!text || streaming) return;
 
-  // 未配置时给出明确引导，而不是报错
-  if (chatConfigured === false) {
-    sysMsg('AI 尚未配置。请到「设置 → AI 大模型」填写接口信息；或先用下方的本地快捷功能。');
-    showChatSetup();
-    return;
+  // 未配置时给出明确引导。配置状态在这里【实时】再查一次：
+  // 用户可能刚在设置页配好直接回来，缓存值（chatConfigured）不可信
+  if (chatConfigured !== true) {
+    const ok = await refreshChatState();
+    if (!ok) {
+      sysMsg('AI 尚未配置。请到「设置 → AI 大模型」填写接口信息；或先用下方的本地快捷功能。');
+      showChatSetup();
+      return;
+    }
   }
 
   chatHistory.push({ role: 'user', content: text });
@@ -528,7 +550,9 @@ function finishStream(data) {
 
   const node = streamingBubble.node && streamingBubble.node.isConnected
     ? streamingBubble.node : null;
-  const finalText = data.error ? (data.content || '') + '\n\n⚠️ ' + data.error : data.content;
+  // trim 掉模型输出首尾的空行，避免气泡顶部出现大片空白
+  const body = (data.content || '').trim();
+  const finalText = data.error ? (body + '\n\n⚠️ ' + data.error).trim() : body;
   if (node) { node.textContent = finalText; node.classList.remove('thinking'); }
   chatHistory.push({ role: 'assistant', content: data.content || '' });
   streamingBubble.node = null;

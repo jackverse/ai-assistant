@@ -336,6 +336,23 @@ func (a *App) SetModuleEnabled(id string, enabled bool) (ModuleDTO, error) {
 	return ModuleDTO{}, nil
 }
 
+// RefreshConfig 从磁盘重新加载配置。
+//
+// 场景：程序运行期间用户手改了 config.yaml，或在别处修改后切回本程序——
+// 内存里的配置是启动时读的，不刷新就一直是旧值。
+// 必须按字段原地更新而非替换 a.cfg 指针：模块注册表的 resolver
+// 持有的是这个指针，整体替换会让运行时开关与文件脱钩。
+func (a *App) RefreshConfig() error {
+	nc, _, err := config.Load()
+	if err != nil {
+		return err
+	}
+	a.cfg.General = nc.General
+	a.cfg.AI = nc.AI
+	a.cfg.Modules = nc.Modules
+	return nil
+}
+
 // ConfigPath 返回配置文件路径，供界面提示用户可手动编辑。
 func (a *App) ConfigPath() string {
 	p, err := config.Path()
