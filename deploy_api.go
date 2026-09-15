@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"winclean/internal/deploy"
+	"winclean/internal/report"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -217,6 +218,21 @@ func (a *App) PrecheckDeploy(project string, modules []string, outputDir string)
 	return deploy.Precheck(a.cfg.Deploy, deploy.RunOptions{
 		Project: project, Modules: modules, OutputDir: outputDir,
 	}), nil
+}
+
+// BuildSpaceReport 从最近一次扫描结果构建人类可读的空间报告。
+//
+// 这是扫描结果的「理解层」：不展示原始路径与字节数，
+// 而是按「你能做什么」分组——系统组件 / 已安装软件 / 开发工具与缓存 /
+// 用户数据 / 可安全清理 / 没认出来的。
+func (a *App) BuildSpaceReport() (report.SpaceReport, error) {
+	a.mu.Lock()
+	res := a.result
+	a.mu.Unlock()
+	if res == nil {
+		return report.SpaceReport{}, errors.New("还没有扫描结果")
+	}
+	return report.BuildSpaceReport(res), nil
 }
 
 // SuggestBasePaths 返回本机可能作为代码根目录的候选（配置页第 1 步的默认值）。

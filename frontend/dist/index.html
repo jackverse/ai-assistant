@@ -1679,9 +1679,34 @@ function banner(boxId, title, items) {
     items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`;
 }
 
-function render(res) {
+async function render(res) {
+  // 空间报告：把扫描事实翻译成人话（系统/安装/开发/用户数据/可清理）
+  let spaceHtml = '';
+  try {
+    const rpt = await A().BuildSpaceReport();
+    if (rpt.groups && rpt.groups.length) {
+      spaceHtml = '<div class="cards">'
+        + '<div class="card stat"><div class="k">可迁移到 D 盘</div><div class="v" style="color:var(--accent)">' + esc(rpt.summary.can_move) + '</div><div class="s">改配置或建联接</div></div>'
+        + '<div class="card stat"><div class="k">可安全清理</div><div class="v" style="color:var(--ok)">' + esc(rpt.summary.can_clean) + '</div><div class="s">删除后不影响功能</div></div>'
+        + '<div class="card stat"><div class="k">用户数据</div><div class="v" style="color:var(--warn)">' + esc(rpt.summary.user_data) + '</div><div class="s">不要删</div></div>'
+        + '</div>';
+      for (const g of rpt.groups) {
+        if (!g.items || !g.items.length) continue;
+        const gIcons = { system:'🪟', installed:'📦', 'dev-cache':'🔧', 'user-data':'📁', 'safe-clean':'🧹', unknown:'❓' };
+        const actColor = g.action.includes('不要') ? 'var(--danger)' : g.action.includes('迁移') || g.action.includes('删') ? 'var(--accent)' : 'var(--muted)';
+        spaceHtml += '<div class="card" style="margin-top:14px"><div class="card-head"><span style="font-size:15px">' + (gIcons[g.id]||'📄') + '</span><span class="t">' + esc(g.title) + '</span><span class="badge" style="color:' + actColor + ';margin-left:8px">' + esc(g.action) + '</span><span style="margin-left:auto" class="muted" style="font-size:12px">' + fmtBytes(g.total_bytes) + '</span></div><div class="pad" style="padding-top:4px">';
+        for (const it of g.items) {
+          const mv = it.can_move ? '<div style="font-size:12px;color:var(--accent)">→ ' + esc(it.move_hint) + '</div>' : '';
+          const dl = it.can_delete ? '<div style="font-size:12px;color:var(--muted)">→ ' + esc(it.delete_hint) + '</div>' : '';
+          spaceHtml += '<div class="listrow" title="' + esc(it.path) + '"><div class="n"><b>' + esc(it.label) + '</b><span class="muted" style="font-size:12px;margin-left:8px">' + esc(it.last_used) + ' · ' + esc(it.frequency) + '</span>' + mv + dl + '</div><span class="badge">' + esc(it.size_human) + '</span></div>';
+        }
+        spaceHtml += '</div></div>';
+      }
+    }
+  } catch (e) { console.warn('空间报告:', e); }
+
   const s = res.stats || {};
-  let html = '';
+  let html = spaceHtml;
   if ((res.warnings || []).length) {
     html += `<div class="banner warn"><div class="t">需要注意</div><ul>${
       res.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
