@@ -22,7 +22,10 @@ type DiscoveredModule struct {
 	Script string `json:"script"` // frontend 的 npm 脚本（已按优先级挑选）
 	Source string `json:"source"` // frontend 产物目录
 	Output string `json:"output"` // 产物名
-	Note   string `json:"note,omitempty"`
+	// Run / Port 是开发态信息（「Java 开发」页据此启停服务）
+	Run  string `json:"run"`
+	Port int    `json:"port"`
+	Note string `json:"note,omitempty"`
 }
 
 // DiscoveredProject 是扫描发现的一个项目。
@@ -168,24 +171,28 @@ func DiscoverProjects(codeRoot string, maxDepth int) ([]DiscoveredProject, []str
 						fmt.Sprintf("模块目录不存在，已跳过：%s", m))
 					continue
 				}
-				proj.Modules = append(proj.Modules, DiscoveredModule{
-					Name:   filepath.Base(modDir),
-					Type:   "backend",
+				mod := DiscoveredModule{
+					Name: filepath.Base(modDir),
+					Type: "backend",
 					// Root 的语义是【相对项目根】——不是相对代码根。
 					// 写成相对代码根会让下游拼出 wic-sh/wic-sh/wic-admin 这种重复路径
 					// （实测预检就是这样抓到的）。
 					Root:   filepath.ToSlash(mustRel(root, modDir)),
 					Output: sanitizeBackendOutput(filepath.Base(modDir)),
-				})
+				}
+				applyDevHint(&mod, DetectDev(modDir, "backend"))
+				proj.Modules = append(proj.Modules, mod)
 			}
 		} else {
 			// 单模块项目：模块目录就是项目根自身
-			proj.Modules = append(proj.Modules, DiscoveredModule{
+			mod := DiscoveredModule{
 				Name:   filepath.Base(root),
 				Type:   "backend",
 				Root:   ".",
 				Output: sanitizeBackendOutput(filepath.Base(root)),
-			})
+			}
+			applyDevHint(&mod, DetectDev(root, "backend"))
+			proj.Modules = append(proj.Modules, mod)
 		}
 
 		// 前端模块：项目根下 ≤2 层找 package.json
@@ -274,6 +281,7 @@ func discoverFrontends(projectRoot string, proj *DiscoveredProject) []Discovered
 		if score < 3 {
 			mod.Note = appendNote(mod.Note, "构建脚本按模式匹配挑选，请确认是否是你想要的那个")
 		}
+		applyDevHint(&mod, DetectDev(dir, "frontend"))
 		out = append(out, mod)
 		return nil
 	})
@@ -388,6 +396,20 @@ func isUnderDir(child, parent string) bool {
 	c := strings.ToLower(filepath.Clean(child))
 	p := strings.ToLower(filepath.Clean(parent))
 	return strings.HasPrefix(c, p+string(os.PathSeparator))
+}
+
+// applyDevHint 把探测到的开发态信息填进模块。
+//
+// 认不出启动命令时不写空值进去——留空有明确语义（这个模块不由本工具启动），
+// 而写一个猜错的命令会让用户点启动后看到一堆莫名其妙的报错。
+func applyDevHint(mod *DiscoveredModule, hint DevHint) {
+	if hint.Found {
+		mod.Run = hint.Run
+	}
+	mod.Port = hint.Port
+	if hint.Note != "" {
+		mod.Note = appendNote(mod.Note, hint.Note)
+	}
 }
 
 func appendNote(existing, add string) string {

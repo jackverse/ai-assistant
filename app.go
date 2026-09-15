@@ -58,40 +58,40 @@ type App struct {
 	bootWarnings []string
 
 	// ── 垃圾清理模块状态（clean_api.go）──
-	cleanMu      sync.Mutex
-	cleanBusy    bool
-	cleanCancel  context.CancelFunc
-	cleanScanDone atomic.Bool
-	cleanScanErr  atomic.Value // string
-	cleanScanCur  atomic.Value // string
+	cleanMu        sync.Mutex
+	cleanBusy      bool
+	cleanCancel    context.CancelFunc
+	cleanScanDone  atomic.Bool
+	cleanScanErr   atomic.Value // string
+	cleanScanCur   atomic.Value // string
 	cleanScanCount atomic.Int64
 	cleanExecDone  atomic.Bool
 	cleanExecErr   atomic.Value // string
 	cleanExecName  atomic.Value // string
 	cleanExecFreed atomic.Int64
 	cleanExecFiles atomic.Int64
-	cleanItems   []clean.Candidate
-	cleanStats   map[string]clean.Stats
-	cleanResults []clean.Result
+	cleanItems     []clean.Candidate
+	cleanStats     map[string]clean.Stats
+	cleanResults   []clean.Result
 
 	// ── 空间迁移模块状态（migrate_api.go）──
-	migMu      sync.Mutex
-	migBusy    bool
-	migCancel  context.CancelFunc
-	migCustomSeq int
-	migScanDone atomic.Bool
-	migScanErr  atomic.Value // string
-	migScanCur  atomic.Value // string
-	migScanCount atomic.Int64
-	migExecDone atomic.Bool
-	migExecErr  atomic.Value // string
-	migPhase    atomic.Value // string
-	migItemName atomic.Value // string
-	migCopiedBytes  atomic.Int64
-	migCopiedFiles  atomic.Int64
-	migCurFile      atomic.Value // string
-	migCands    []migrate.Cand
-	migResults  []migrate.ItemResult
+	migMu          sync.Mutex
+	migBusy        bool
+	migCancel      context.CancelFunc
+	migCustomSeq   int
+	migScanDone    atomic.Bool
+	migScanErr     atomic.Value // string
+	migScanCur     atomic.Value // string
+	migScanCount   atomic.Int64
+	migExecDone    atomic.Bool
+	migExecErr     atomic.Value // string
+	migPhase       atomic.Value // string
+	migItemName    atomic.Value // string
+	migCopiedBytes atomic.Int64
+	migCopiedFiles atomic.Int64
+	migCurFile     atomic.Value // string
+	migCands       []migrate.Cand
+	migResults     []migrate.ItemResult
 }
 
 // NewApp 创建应用对象并注册全部功能模块。
@@ -156,15 +156,20 @@ func registerModules() {
 	r.Register(modules.Module{
 		Meta: modules.Meta{
 			ID:             "deploy",
-			Name:           "Java 打包部署",
-			Desc:           "一键构建后端 war_exploded 与前端 dist 产物，自动探测 Maven/JDK",
-			Icon:           "📦",
+			Name:           "Java 开发",
+			Desc:           "单独启停服务 · 加载依赖 · 查看 Git 变更 · 打包产物",
+			Icon:           "🛠",
 			Status:         modules.StatusReady,
 			DefaultEnabled: true,
 		},
 		OpenFn: func() (modules.OpenResult, error) {
-			// 零成本初始化：不探测工具链、不读源码目录。
-			// 工具链探测由用户在页面上点「重新探测」时执行。
+			// 首次进入才做的事：把服务运行时的事件接上事件总线。
+			// 这不产生 IO、不起协程、不查端口——只是一次函数指针赋值；
+			// 放在这里而不是 startup()，是为了让「从没进过本页面的用户」
+			// 连这点连接都不建立（见 AGENTS.md §2.1 第 5 条）。
+			if appRef != nil {
+				appRef.initDevEvents()
+			}
 			return modules.OpenResult{OK: true}, nil
 		},
 	})
@@ -375,6 +380,12 @@ func (a *App) SetModuleEnabled(id string, enabled bool) (ModuleDTO, error) {
 	a.cfg.SetEnabled(id, enabled)
 	if err := a.cfg.Save(); err != nil {
 		return ModuleDTO{}, fmt.Errorf("写入配置失败: %w", err)
+	}
+	// 禁用「Java 开发」时把它启动的服务一并停掉。
+	// 规则是「模块被禁用后必须回到从未加载的状态」（AGENTS.md §2.1 第 9 条），
+	// 留下几个由它启动、界面又再也管不到的 java 进程，显然不算。
+	if !enabled && id == "deploy" {
+		devMgr().StopAll()
 	}
 	for _, m := range a.reg.List() {
 		if m.Meta.ID == id {

@@ -206,7 +206,7 @@ func Precheck(cfg Config, opts RunOptions) PrecheckResult {
 		if t == "" {
 			t = "backend"
 		}
-		modDir := resolveModuleDir(base, j.proj, mod)
+		modDir := ResolveModuleDir(base, j.proj, mod)
 		label := j.proj.Name + "/" + mod.Name
 
 		if !dirExists(modDir) {

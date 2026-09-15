@@ -32,6 +32,11 @@ type ModuleConfig struct {
 	Script string `yaml:"script" json:"script"`
 	// Output 是产物名，默认取 Name
 	Output string `yaml:"output" json:"output"`
+	// Run 是开发态的启动命令（如 `mvn spring-boot:run`、`npm run "admin dev"`）。
+	// 留空表示这个模块不通过本工具启动。由扫描自动识别，用户可改。
+	Run string `yaml:"run" json:"run"`
+	// Port 是该模块期望占用的端口，用于查占用与「杀端口」。0 表示未知。
+	Port int `yaml:"port" json:"port"`
 }
 
 // ProjectConfig 是一个项目及其模块。
@@ -203,7 +208,7 @@ func Run(ctx context.Context, cfg Config, opts RunOptions, emit func(Event)) err
 			mod.Root = mod.Name
 		}
 
-		modDir := resolveModuleDir(base, j.proj, mod)
+		modDir := ResolveModuleDir(base, j.proj, mod)
 		var err error
 		var out string
 		switch mod.Type {
@@ -653,7 +658,7 @@ func filterEnvFiles(assemblyDir, keepEnv string) (int, error) {
 // NormalizeConfig 规整配置里的模块 Root，必要时原地改写。
 //
 // 为什么需要「自愈」而不只是运行期容错：
-// resolveModuleDir 能在预检与打包时兜住错误的 Root，但配置文件本身
+// ResolveModuleDir 能在预检与打包时兜住错误的 Root，但配置文件本身
 // 仍然带着错值——界面显示、用户核对、别人接手时都会困惑
 // （实测出现过 D:\code\wic-sh\wic-sh\wic-admin 这种项目目录重复的路径）。
 // 所以在加载与保存时把 Root 改写成正确值并落盘，让配置回到自洽状态。
@@ -676,7 +681,7 @@ func NormalizeConfig(cfg *Config, base string) bool {
 		for mi := range proj.Modules {
 			mod := &proj.Modules[mi]
 
-			primary := resolveModuleDir(base, *proj, *mod)
+			primary := ResolveModuleDir(base, *proj, *mod)
 			// 已经是自洽的（主候选就存在）→ 不改
 			cur := filepath.Join(base, filepath.FromSlash(strings.TrimSpace(proj.Root)))
 			wantRoot := strings.TrimSpace(mod.Root)
@@ -707,7 +712,7 @@ func NormalizeConfig(cfg *Config, base string) bool {
 	return changed
 }
 
-// resolveModuleDir 解析模块目录。
+// ResolveModuleDir 解析模块目录。
 //
 // Module.Root 的语义是【相对项目根】。但配置可能来自三个途径，
 // 语义不一定可靠：
@@ -719,7 +724,7 @@ func NormalizeConfig(cfg *Config, base string) bool {
 // 让报错指向最可能的位置。这条容错实测救过一次配置：
 // 早期版本的扫描把 Root 写成了相对代码根，预检报出
 // D:\code\wic-sh\wic-sh\wic-admin，靠这里自动纠正回正确目录。
-func resolveModuleDir(base string, proj ProjectConfig, mod ModuleConfig) string {
+func ResolveModuleDir(base string, proj ProjectConfig, mod ModuleConfig) string {
 	root := strings.TrimSpace(mod.Root)
 	if root == "" {
 		root = mod.Name

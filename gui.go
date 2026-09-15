@@ -45,7 +45,10 @@ func runGUI() {
 		},
 		BackgroundColour: &options.RGBA{R: 15, G: 17, B: 21, A: 255},
 		OnStartup:        app.startup,
-		Bind:             []interface{}{app},
+		// 退出时把由本程序启动的服务一并停掉：不这么做的话，
+		// 关掉助手后 java 进程还占着端口，下次开发就被「端口已被占用」绊住。
+		OnShutdown: app.shutdownDev,
+		Bind:       []interface{}{app},
 		Windows: &windows.Options{
 			Theme:                windows.Dark,
 			WebviewIsTransparent: false,

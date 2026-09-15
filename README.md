@@ -14,16 +14,22 @@ Windows 桌面工具集。当前项目：**winclean** — 磁盘空间治理工�
 
 ## 当前状态
 
-**扫描 + 清理 + 迁移**。三个功能均已可用（界面或 CLI）：
+**扫描 + 清理 + 迁移 + Java 开发**。功能均已可用（界面或 CLI）：
 
 - 磁盘扫描与分析（M1，只读）
 - 垃圾清理：内置白名单候选（L2 默认勾选 / L1 需确认），逐文件年龄与占用过滤，
   重解析点永不删除，删除不进回收站（见 `docs/design/06`、`09`）
 - 空间迁移：复制 → 校验 → 原位置换 Junction，原数据保留为备份，
   支持整体撤销与延迟清理备份（见 `docs/design/07`）
+- Java 开发（简化版 IDE 的运行栏）：按模块单独启停服务、查端口归属与一键清端口、
+  加载依赖（`mvn dependency:go-offline` / `npm install` 系）、查看 Git 变更；
+  项目清单与打包模块复用同一份配置（见 `docs/design/21`）
 
 - 设计文档：[`docs/design/README.md`](docs/design/README.md)
 - 实测数据基线：[`docs/design/12-实测基线与样例数据.md`](docs/design/12-实测基线与样例数据.md)
+- **架构硬性规则（加功能前必读）**：[`AGENTS.md`](AGENTS.md)、
+  [`docs/design/20-扩展模块架构规范.md`](docs/design/20-扩展模块架构规范.md)
+  —— 一切功能皆扩展模块，不加载就不造成运行负担
 
 ## 本期范围
 
@@ -36,5 +42,5 @@ Go 1.22+ / cobra / x/sys/windows / yaml.v3，产出单个无依赖的 exe。
 
 ## 环境要求（开发）
 
-- Go 1.22+（本机尚未安装，`winget install GoLang.Go` 可装）
+- Go 1.22+（`go.mod` 声明 1.25；本机在 `D:\dev\go`，`go version` 当前为 1.27.1）
 - Windows 10 1809+ / Windows 11

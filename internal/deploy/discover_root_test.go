@@ -67,19 +67,19 @@ func TestResolveModuleDirToleratesLegacyRoot(t *testing.T) {
 	proj := ProjectConfig{Name: "wic-sh", Root: "wic-sh"}
 
 	// 正确写法：root 相对项目根
-	if got := resolveModuleDir(base, proj, ModuleConfig{Name: "wic-admin", Root: "wic-admin"}); got != real {
+	if got := ResolveModuleDir(base, proj, ModuleConfig{Name: "wic-admin", Root: "wic-admin"}); got != real {
 		t.Errorf("标准配置应解析到 %s，实际 %s", real, got)
 	}
 	// 缺省 root：用模块名
-	if got := resolveModuleDir(base, proj, ModuleConfig{Name: "wic-admin"}); got != real {
+	if got := ResolveModuleDir(base, proj, ModuleConfig{Name: "wic-admin"}); got != real {
 		t.Errorf("缺省 root 应解析到 %s，实际 %s", real, got)
 	}
 	// 旧版错误写法：root 相对代码根（wic-sh/wic-admin）
-	if got := resolveModuleDir(base, proj, ModuleConfig{Name: "wic-admin", Root: "wic-sh/wic-admin"}); got != real {
+	if got := ResolveModuleDir(base, proj, ModuleConfig{Name: "wic-admin", Root: "wic-sh/wic-admin"}); got != real {
 		t.Errorf("旧版错误的 root 应被自动纠正为 %s，实际 %s", real, got)
 	}
 	// 单模块项目：root 为 "."
-	if got := resolveModuleDir(base, ProjectConfig{Name: "wic-sh", Root: "wic-sh"}, ModuleConfig{Name: "wic-sh", Root: "."}); got != filepath.Join(base, "wic-sh") {
+	if got := ResolveModuleDir(base, ProjectConfig{Name: "wic-sh", Root: "wic-sh"}, ModuleConfig{Name: "wic-sh", Root: "."}); got != filepath.Join(base, "wic-sh") {
 		t.Errorf("root=. 应解析到项目根，实际 %s", got)
 	}
 }
