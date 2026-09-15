@@ -348,6 +348,16 @@
   }
   .pathchip .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  /* ── 服务日志预览（Java 开发页）── */
+  .devlog {
+    max-height: 150px; overflow: auto; margin-top: 6px;
+    padding: 10px 12px; border-radius: var(--radius-sm);
+    background: #080a0e; border: 1px solid var(--hairline);
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.6;
+    color: var(--fg-2); white-space: pre-wrap; word-break: break-all;
+    user-select: text;
+  }
+
   /* ── 预检清单 ── */
   .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--hairline); }
   .check-item:last-child { border-bottom: 0; }
@@ -713,18 +723,75 @@
         </div></div>
       </div>
 
-                  <!-- 部署打包页：打包与配置分离（默认停在「打包」） -->
+                  <!-- Java 开发页：服务启停为主，Git 变更与打包在后 -->
       <div class="page" id="page-deploy">
         <div class="row" style="justify-content:space-between;margin-bottom:18px">
           <div class="segment">
-            <button data-dtab="run" class="on">打包</button>
+            <button data-dtab="svc" class="on">服务</button>
+            <button data-dtab="git">变更</button>
+            <button data-dtab="run">打包</button>
             <button data-dtab="config">配置</button>
           </div>
           <span class="hint" id="dpTabHint"></span>
         </div>
 
+        <!-- ────────── 服务页：单独启停 ────────── -->
+        <div id="dtab-svc">
+          <div class="card hidden" id="devEmpty">
+            <div class="empty">
+              <div class="big">还没有可启动的模块</div>
+              <div class="s">「Java 开发」复用打包页的项目清单：先到「配置」页选代码目录并扫描。<br>
+                模块的启动命令与端口会自动识别，认不出来也可以手填。</div>
+              <div style="margin-top:18px"><button class="primary" id="devGotoConfig">去配置</button></div>
+            </div>
+          </div>
+
+          <div id="devMain" class="hidden">
+            <div class="banner" id="devBanner" style="display:none"></div>
+
+            <div class="card">
+              <div class="card-head">
+                <span class="t">服务</span>
+                <span class="d" id="devSummary"></span>
+                <span class="spacer"></span>
+                <button class="sm ghost" id="devDetectAll">识别启动方式</button>
+                <button class="sm ghost" id="devRefresh">刷新</button>
+              </div>
+              <div class="pad" style="padding-top:6px" id="devList"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <span class="t">端口工具</span>
+                <span class="d">查一个端口被谁占着；确认是自己不要的进程再清掉</span>
+              </div>
+              <div class="pad">
+                <div class="row">
+                  <input type="number" id="devPortInput" placeholder="端口号，如 8080" style="width:150px">
+                  <button id="devPortCheck">查占用</button>
+                  <span class="hint">只结束占用进程，不改任何系统设置；系统关键进程一律拒绝</span>
+                </div>
+                <div id="devPortResult" style="margin-top:12px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ────────── 变更页：Git 改动一目了然 ────────── -->
+        <div id="dtab-git" class="hidden">
+          <div class="card">
+            <div class="card-head">
+              <span class="t">Git 变更</span>
+              <span class="d">只读：看分支与改动文件，不做提交、切分支、拉取推送</span>
+              <span class="spacer"></span>
+              <button class="sm ghost" id="gitRefresh">刷新</button>
+            </div>
+            <div class="pad" id="gitList" style="padding-top:6px"></div>
+          </div>
+        </div>
+
         <!-- ────────── 打包页 ────────── -->
-        <div id="dtab-run">
+        <div id="dtab-run" class="hidden">
           <div class="card hidden" id="dpNotReady">
             <div class="empty">
               <div class="mark">
@@ -1001,6 +1068,7 @@ const ICONS = {
   chat: '<path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5H7.6L3 23v-4.6A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.5 11.5h7"/>',
   scan: '<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/>',
   deploy: '<path d="M12 3 3 7.6v8.8L12 21l9-4.6V7.6L12 3Z"/><path d="M3 7.6 12 12l9-4.4M12 12v9"/>',
+  dev: '<rect x="2.8" y="4" width="18.4" height="16" rx="2.4"/><path d="m7 9.4 3 2.9-3 2.9"/><path d="M12.6 15.4h4.4"/>',
   clean: '<path d="M9 3h6l1 6H8l1-6Z"/><path d="M8 9h8l-1 12H9L8 9Z"/><path d="M10 13h4"/>',
   migrate: '<path d="M4 8h12"/><path d="m13 5 3 3-3 3"/><path d="M20 16H8"/><path d="m11 13-3 3 3 3"/>',
   settings: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.2a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4Z"/>',
@@ -1011,7 +1079,7 @@ const ICONS = {
 const PAGE_META = {
   chat: { icon: ICONS.chat, name: 'AI 助手', sub: '与大模型对话；未配置大模型时也可使用下方本地快捷功能' },
   disk: { icon: ICONS.scan, name: '磁盘整理', sub: '空间扫描 · 垃圾清理 · 空间迁移' },
-  deploy: { icon: ICONS.deploy, name: 'Java 打包部署', sub: '构建后端 war_exploded 与前端产物；工具链自动探测、输出目录可选' },
+  deploy: { icon: ICONS.dev, name: 'Java 开发', sub: '单独启停服务 · 加载依赖 · 查看 Git 变更 · 打包产物' },
   settings: { icon: ICONS.settings, name: '设置', sub: '主页选择 · AI 接入 · 模块开关' },
 };
 // 磁盘整理页内各页签的副标题。
@@ -1725,20 +1793,23 @@ async function render(res) {
           <span class="mono" style="font-size:12px;color:var(--fg-3);white-space:nowrap">${esc(item.size)}</span>
         </div>`;
       } else {
-        // 绿色/黄色区：有勾选框
+        // 绿色/黄色区：有勾选框，点名称可展开核对里面有什么
         const checked = item.checked ? ' checked' : '';
         const cbColor = g.level === 'safe' ? 'var(--ok)' : 'var(--warn)';
         const mv = item.move_hint ? `<div style="font-size:11.5px;color:var(--accent);margin-top:2px">→ ${esc(item.move_hint)}</div>` : '';
-        html += `<div class="check-item">
+        html += `<div class="check-item" style="flex-wrap:wrap">
           <input type="checkbox" data-level="${g.level}" data-size="${item.size}"${checked}
                  style="accent-color:${cbColor};width:15px;height:15px;margin-top:3px;flex:none">
           <div style="flex:1;min-width:0">
             <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
-              <b style="font-size:13px;font-weight:500">${esc(item.name)}</b>
+              <b style="font-size:13px;font-weight:500;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px"
+                 data-drill="${esc(item.path)}" title="点击查看里面有什么">${esc(item.name)}</b>
               <span class="mono" style="font-size:12px;color:var(--fg-3);white-space:nowrap">${esc(item.size)}</span>
             </div>
             <div style="font-size:12px;color:var(--fg-3);margin-top:2px">${esc(item.reason)}</div>
             ${mv}
+            <div class="muted" style="font-size:11.5px;margin-top:2px">${esc(item.path)}</div>
+            <div data-drillbox="${esc(item.path)}" class="hidden" style="margin-top:8px;border-left:2px solid var(--hairline-2);padding-left:10px"></div>
           </div>
         </div>`;
       }
@@ -1748,13 +1819,14 @@ async function render(res) {
 
   // 操作按钮
   html += `<div class="row" style="margin-top:16px;gap:10px">
-    <button class="primary" id="btnDoClean" onclick="alert('清理功能在后续版本提供。当前版本只做扫描分析。')">
+    <button class="primary" id="btnDoClean" onclick="alert('按设计文档的里程碑，清理执行属于后续版本。\\n当前先请你核对绿色区的判断是否都正确——确认无误后再开放执行。')">
       🗑️ 删除已勾选
     </button>
-    <button onclick="alert('迁移功能在后续版本提供。当前版本只做扫描分析。')">
+    <button onclick="alert('迁移执行属于后续版本。当前版本只做分析。')">
       📦 迁移已勾选到 D 盘
     </button>
-    <span class="muted" style="font-size:12px">删除与迁移功能在后续版本开放，当前版本只做分析</span>
+    <button id="btnExportDecision">📋 导出判断清单</button>
+    <span class="muted" style="font-size:12px">执行功能尚未开放：先核对判断是否准确</span>
   </div>`;
 
   el('results').innerHTML = html;
@@ -1764,6 +1836,48 @@ async function render(res) {
     cb.addEventListener('change', updateSubtotal);
   });
   updateSubtotal();
+
+  // 点名称展开核对：让用户亲眼确认绿色项里到底是什么
+  el('results').querySelectorAll('[data-drill]').forEach(b => {
+    b.addEventListener('click', () => drillDown(b.dataset.drill));
+  });
+
+  // 导出判断清单（Markdown，供人工复核）
+  const exp = el('btnExportDecision');
+  if (exp) exp.addEventListener('click', async () => {
+    try {
+      const p = await A().ExportDecisionList();
+      if (p) toast('已导出判断清单：' + p);
+    } catch (e) { toast(String(e), true); }
+  });
+}
+
+// drillDown 展开一个目录的直接子项。
+//
+// 用遍历比较而不是 CSS 选择器找容器：Windows 路径含反斜杠，
+// 而反斜杠在 CSS 选择器里是转义字符，用属性选择器匹配容易出错。
+async function drillDown(path) {
+  let box = null;
+  document.querySelectorAll('[data-drillbox]').forEach(el2 => {
+    if (el2.dataset.drillbox === path) box = el2;
+  });
+  if (!box) return;
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="muted" style="font-size:12px">读取中…</div>';
+  try {
+    const items = await A().DrillDown(path) || [];
+    if (!items.length) { box.innerHTML = '<div class="muted" style="font-size:12px">（空目录或无法读取）</div>'; return; }
+    box.innerHTML = '<div class="muted" style="font-size:11.5px;margin-bottom:4px">里面有什么：</div>'
+      + items.map(i => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2px 0">
+          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(i.name)}
+            <span class="muted" style="font-size:11px">${esc(i.reason)}</span></span>
+          <span class="mono muted" style="white-space:nowrap">${esc(i.size)}</span>
+        </div>`).join('');
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--danger)">' + esc(String(e)) + '</div>';
+  }
 }
 
 function groupBytes(groups, level) {
@@ -1799,11 +1913,12 @@ let deployReady = false;
 let dpDiscovered = [];     // 最近一次扫描结果
 let dpChosen = null;       // 第 2 步里选中的项目
 let dpChecks = null;       // 最近一次预检结果
-let dpTab = 'run';
+let dpTab = 'svc';   // 默认停在「服务」：开发页的主要动作是启停
 
 async function initDeploy() {
   if (deployReady) {
     await refreshDeploy();
+    await refreshDev(false);
     return;
   }
   deployReady = true;
@@ -1876,17 +1991,26 @@ async function initDeploy() {
   el('dpCancel').addEventListener('click', () => A().CancelPack());
   ['dpOut', 'dpKeepEnv'].forEach(id => el(id).addEventListener('change', saveDeploy));
 
+  initDevPage();
+
   await refreshDeploy();
   await loadBaseCandidates();
   await runDetect(false);
 }
 
+// 页签切换。四个页签的可见性集中在这里，别处不要各自去改 class。
 function showDeployTab(tab) {
   dpTab = tab;
   document.querySelectorAll('#page-deploy .segment button[data-dtab]').forEach(b =>
     b.classList.toggle('on', b.dataset.dtab === tab));
+  el('dtab-svc').classList.toggle('hidden', tab !== 'svc');
+  el('dtab-git').classList.toggle('hidden', tab !== 'git');
   el('dtab-run').classList.toggle('hidden', tab !== 'run');
   el('dtab-config').classList.toggle('hidden', tab !== 'config');
+
+  // 按需加载：进服务页才查进程与端口，进变更页才跑 git（都不便宜）
+  if (tab === 'svc') refreshDev(true);
+  if (tab === 'git') refreshGit(true);
 }
 
 function dpGotoStep(n) {
@@ -2201,6 +2325,427 @@ function dpLog(line) {
   box.textContent += (box.textContent ? '\n' : '') + line;
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
   if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+/* ───────── Java 开发页：服务启停 / 端口 / Git 变更 ─────────
+   设计取舍：
+   - 不做实时日志流式渲染的「终端」仿真，只把子进程输出按行追加到一个固定高度的
+     预览区，滚动贴合底部；要看全量点「全部日志」。
+   - 状态刷新用轮询而不是纯事件：进程可能被本程序之外的东西杀掉
+     （比如端口工具、任务管理器），只看事件会长期显示错误状态。 */
+let devReady = false;
+let devData = null;          // 最近一次 GetDevPage 的结果
+let devEditing = '';         // 正在编辑命令的服务 id
+let devTimer = null;         // 轮询定时器
+let gitLoaded = false;
+
+function initDevPage() {
+  if (devReady) return;
+  devReady = true;
+
+  R().EventsOn('dev:event', ev => {
+    if (!ev || !ev.id) return;
+    if (ev.kind === 'log') {
+      devAppendLog(ev.id, ev.line);
+      const s = devFind(ev.id);
+      if (s) { s.logs = (s.logs || []).concat([ev.line]).slice(-200); }
+    } else if (ev.kind === 'state') {
+      const s = devFind(ev.id);
+      if (s) {
+        s.state = ev.state;
+        s.pid = ev.pid || 0;
+        if (ev.exit_code !== undefined && ev.exit_code !== null) s.exit_code = ev.exit_code;
+        if (ev.error) s.error = ev.error;
+        devRenderOne(s);
+      }
+      // 状态变化后端口占用往往也变了，隔一拍再刷新一次
+      setTimeout(() => refreshDev(false), 800);
+    }
+  });
+
+  el('devRefresh').addEventListener('click', () => refreshDev(true));
+  el('devDetectAll').addEventListener('click', detectAllDev);
+  el('devGotoConfig').addEventListener('click', () => showDeployTab('config'));
+  el('gitRefresh').addEventListener('click', () => refreshGit(true));
+  el('devPortCheck').addEventListener('click', () => checkPortTool());
+  el('devPortInput').addEventListener('keydown', e => { if (e.key === 'Enter') checkPortTool(); });
+
+  // 轮询：只在页面可见且停在服务页签时跑，避免在别的页面做无谓的系统调用
+  devTimer = setInterval(() => {
+    if (curPage === 'deploy' && dpTab === 'svc') refreshDev(false);
+  }, 4000);
+}
+
+function devFind(id) {
+  return (devData && devData.services || []).find(s => s.id === id);
+}
+
+async function refreshDev(showToast) {
+  let dto;
+  try {
+    dto = await A().GetDevPage(false);
+  } catch (e) {
+    if (showToast) toast('读取服务状态失败：' + e, true);
+    return;
+  }
+  const prevScroll = {};
+  (devData && devData.services || []).forEach(s => {
+    const b = el('devLog_' + cssId(s.id));
+    if (b) prevScroll[s.id] = b.scrollTop;
+  });
+
+  devData = dto;
+  devRenderServices();
+
+  // 日志区重建后恢复滚动位置
+  Object.keys(prevScroll).forEach(id => {
+    const b = el('devLog_' + cssId(id));
+    if (b) b.scrollTop = b.scrollHeight;
+  });
+}
+
+function cssId(s) { return String(s).replace(/[^A-Za-z0-9_-]/g, '_'); }
+
+function devRenderServices() {
+  const svcs = (devData && devData.services) || [];
+  const hasCfg = !!(devData && devData.base_path) && svcs.length > 0;
+
+  el('devEmpty').classList.toggle('hidden', hasCfg);
+  el('devMain').classList.toggle('hidden', !hasCfg);
+  if (!hasCfg) {
+    el('devSummary').textContent = '';
+    return;
+  }
+
+  const running = svcs.filter(s => s.state === 'running').length;
+  el('devSummary').textContent = `${svcs.length} 个模块 · ${running} 个在运行`;
+
+  // 顶部提示：未识别启动方式的模块、缺 JDK 等
+  const notes = (devData.notes || []).slice();
+  const unready = svcs.filter(s => !s.ready).length;
+  if (unready > 0 && notes.length === 0) {
+    notes.push(`${unready} 个模块还没有启动命令，点右上角「识别启动方式」自动填`);
+  }
+  const banner = el('devBanner');
+  if (notes.length) {
+    banner.style.display = '';
+    banner.innerHTML = notes.map(n => `<div>· ${esc(n)}</div>`).join('');
+  } else {
+    banner.style.display = 'none';
+  }
+
+  el('devList').innerHTML = svcs.map(s => devCardHtml(s)).join('');
+  devBindCardEvents();
+}
+
+function devCardHtml(s) {
+  const st = DEV_STATE[s.state] || DEV_STATE.stopped;
+  const port = s.port > 0 ? `:${s.port}` : '';
+  const ps = s.port_status;
+  const lines = s.logs || [];
+
+  return `<div class="listrow" data-svc="${esc(s.id)}" style="display:block;padding:14px;border:1px solid var(--hairline);margin-bottom:10px">
+    <div class="row" style="gap:10px">
+      <b style="font-size:13.5px">${esc(s.name)}</b>
+      <span class="badge ${s.type === 'frontend' ? 'b-link' : 'b-sum'}">${esc(s.type || 'backend')}</span>
+      <span class="badge ${st.cls}" id="devStateBadge_${cssId(s.id)}">${st.text}${s.state === 'running' && s.pid ? ' · PID ' + s.pid : ''}</span>
+      <span class="hint">${esc(s.project)}</span>
+      <span class="spacer" style="flex:1"></span>
+      ${devActionButtons(s)}
+    </div>
+
+    <div class="row" style="gap:10px;margin-top:9px">
+      <span class="mono" style="font-size:12px;color:var(--fg-3)">${esc(s.dir)}</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="hint">${esc(s.started_at ? '启动于 ' + s.started_at : '')}</span>
+    </div>
+
+    ${devPortRow(s)}
+
+    ${devEditing === s.id ? devEditHtml(s) : `
+      <div class="row" style="gap:8px;margin-top:8px">
+        <span class="mono" style="font-size:12px;color:var(--fg-2);flex:1;word-break:break-all">
+          ${esc(s.run || '（未设置启动命令）')}${port ? '   ·   端口 ' + esc(String(s.port)) : ''}</span>
+        <button class="sm ghost" data-act="edit" data-id="${esc(s.id)}">改命令</button>
+      </div>`}
+
+    ${s.error ? `<div class="hint" style="color:var(--danger);margin-top:6px">${esc(s.error)}</div>` : ''}
+
+    ${lines.length ? `
+      <div class="row" style="margin-top:8px">
+        <span class="hint">最近输出</span>
+        <span class="spacer" style="flex:1"></span>
+        <button class="sm ghost" data-act="clearlog" data-id="${esc(s.id)}">清空</button>
+      </div>
+      <div id="devLog_${cssId(s.id)}" class="devlog">${esc(lines.join('\n'))}</div>` : ''}
+  </div>`;
+}
+
+function devActionButtons(s) {
+  const busy = s.state === 'running' || s.state === 'starting' || s.state === 'stopping';
+  const stopBtn = s.state === 'running' || s.state === 'starting'
+    ? `<button class="sm" data-act="stop" data-id="${esc(s.id)}">停止</button>` : '';
+  const startBtn = !busy
+    ? `<button class="sm primary" data-act="start" data-id="${esc(s.id)}" ${s.ready ? '' : 'disabled title="' + esc(s.reason || '') + '"'}>启动</button>`
+    : `<button class="sm ghost" data-act="start" data-id="${esc(s.id)}" disabled>启动</button>`;
+  return `${startBtn}${stopBtn}
+    <button class="sm ghost" data-act="restart" data-id="${esc(s.id)}" ${s.ready ? '' : 'disabled'}>重启</button>
+    <button class="sm ghost" data-act="deps" data-id="${esc(s.id)}">加载依赖</button>
+    <button class="sm ghost" data-act="dir" data-id="${esc(s.id)}">目录</button>`;
+}
+
+// devPortRow 展示端口归属，并提供「杀端口」。
+// 端口被自己启动的服务占着是正常状态，用绿色；被别的进程占着才是问题，用黄色。
+function devPortRow(s) {
+  const ps = s.port_status;
+  if (!ps || !ps.listeners) {
+    return s.port > 0
+      ? `<div class="row" style="margin-top:8px"><span class="badge b-ok">端口 ${s.port} 空闲</span></div>`
+      : '';
+  }
+  const mine = s.state === 'running' && s.pid && ps.holders.some(h => h.pid === s.pid);
+  const h = ps.holders[0];
+  return `<div class="row" style="margin-top:8px;gap:8px">
+    <span class="badge ${mine ? 'b-ok' : 'b-warn'}">端口 ${s.port} ${mine ? '本服务监听中' : '被占用'}</span>
+    <span class="mono" style="font-size:12px;color:var(--fg-3)">${esc(h.process)} (PID ${h.pid})</span>
+    ${mine ? '' : `<button class="sm ghost" data-act="killport" data-id="${esc(s.id)}" data-port="${s.port}">杀端口</button>`}
+  </div>`;
+}
+
+function devEditHtml(s) {
+  return `<div class="row" style="gap:8px;margin-top:10px">
+      <input type="text" id="devRun_${cssId(s.id)}" value="${esc(s.run || '')}"
+             placeholder="启动命令，如 mvn spring-boot:run" style="flex:1;min-width:260px">
+      <input type="number" id="devPort_${cssId(s.id)}" value="${s.port || ''}" placeholder="端口" style="width:100px">
+      <button class="sm" data-act="detect" data-id="${esc(s.id)}">识别</button>
+      <button class="sm primary" data-act="save" data-id="${esc(s.id)}">保存</button>
+      <button class="sm ghost" data-act="cancel" data-id="${esc(s.id)}">取消</button>
+    </div>
+    <div class="hint" style="margin-top:6px">
+      命令在模块目录下用 cmd.exe 执行；依赖命令是 ${esc(s.deps || '(未识别)')}。端口用于检测占用与「杀端口」。
+    </div>`;
+}
+
+const DEV_STATE = {
+  stopped:  { text: '未运行', cls: 'b-sum' },
+  starting: { text: '启动中', cls: 'b-link' },
+  running:  { text: '运行中', cls: 'b-ok' },
+  stopping: { text: '停止中', cls: 'b-warn' },
+  exited:   { text: '已退出', cls: 'b-warn' },
+};
+
+function devBindCardEvents() {
+  el('devList').querySelectorAll('button[data-act]').forEach(b => {
+    b.addEventListener('click', () => devAction(b.dataset.act, b.dataset.id, b.dataset.port));
+  });
+}
+
+async function devAction(act, id, port) {
+  const s = devFind(id);
+  if (!s) return;
+  try {
+    switch (act) {
+      case 'start':
+        await A().StartDevService(id);
+        toast('已启动 ' + s.name);
+        break;
+      case 'stop':
+        await A().StopDevService(id);
+        toast('已停止 ' + s.name);
+        break;
+      case 'restart':
+        await A().RestartDevService(id);
+        toast('正在重启 ' + s.name);
+        break;
+      case 'deps':
+        await A().LoadDevDeps(id);
+        toast('开始加载依赖：' + s.name);
+        break;
+      case 'dir':
+        await A().OpenProjectDir(s.dir);
+        return;
+      case 'clearlog':
+        await A().DevClearLogs(id);
+        break;
+      case 'edit':
+        devEditing = id;
+        devRenderServices();
+        return;
+      case 'cancel':
+        devEditing = '';
+        devRenderServices();
+        return;
+      case 'detect': {
+        const h = await A().DetectDevService(s.project, s.module);
+        el('devRun_' + cssId(id)).value = h.run || '';
+        if (h.port) el('devPort_' + cssId(id)).value = h.port;
+        toast(h.found === false && !h.run ? (h.note || '没认出启动方式，请手填') : '已填入识别结果');
+        return;
+      }
+      case 'save': {
+        const run = el('devRun_' + cssId(id)).value.trim();
+        const p = parseInt(el('devPort_' + cssId(id)).value || '0', 10) || 0;
+        await A().SaveDevService(s.project, s.module, run, p);
+        devEditing = '';
+        toast('已保存');
+        break;
+      }
+      case 'killport':
+        return killPortFlow(Number(port), s.name);
+    }
+  } catch (e) {
+    toast(String(e && e.message || e), true);
+  }
+  await refreshDev(false);
+}
+
+// killPortFlow 先看清是谁再杀——「杀端口」是个破坏性动作，
+// 必须让用户在点下去之前知道会杀掉哪个进程。
+async function killPortFlow(port, ownerName) {
+  let st;
+  try { st = await A().CheckPort(port); } catch (e) { toast(String(e), true); return; }
+  if (!st.busy) { toast(`端口 ${port} 现在是空闲的`); await refreshDev(false); return; }
+
+  const rows = st.holders.map(h => `<div class="listrow" style="padding:6px 0">
+      <span class="badge ${h.safe ? 'b-warn' : 'b-danger'}">PID ${h.pid}</span>
+      <span class="mono" style="flex:1;font-size:12px;word-break:break-all">${esc(h.process)}</span>
+      <span class="hint">${esc(h.state)}</span>
+    </div>`).join('');
+  const unsafe = st.holders.filter(h => !h.safe);
+
+  const ok = await confirmModal(
+    `结束占用端口 ${port} 的进程？`,
+    `<div>${rows}</div>
+     <div style="margin-top:10px">这些进程会被强制结束（连同其子进程）${ownerName ? `。「${esc(ownerName)}」的端口也会随之释放` : ''}。
+     未保存的工作会丢失——请确认它们不是你正在用的东西。</div>
+     ${unsafe.length ? `<div style="margin-top:8px;color:var(--warn)">其中 ${unsafe.length} 个是系统进程，会被自动跳过：${esc(unsafe[0].reason || '')}</div>` : ''}`,
+    '结束进程');
+  if (!ok) return;
+
+  try {
+    const res = await A().KillPort(port);
+    const killed = (res.killed || []).length;
+    const failed = (res.failed || []).length;
+    toast(killed ? `已结束 ${killed} 个进程` : '没有进程被结束（可能都是系统进程）', !killed && failed > 0);
+    if (failed) console.warn('杀端口未完成的部分：', res.failed);
+  } catch (e) { toast(String(e), true); }
+  await refreshDev(false);
+}
+
+// 端口工具：查任意端口（不限于配置里的端口）
+async function checkPortTool() {
+  const port = parseInt(el('devPortInput').value || '0', 10);
+  const box = el('devPortResult');
+  if (!port) { box.innerHTML = '<span class="hint">请输入端口号</span>'; return; }
+  let st;
+  try { st = await A().CheckPort(port); } catch (e) { toast(String(e), true); return; }
+
+  if (!st.busy) {
+    box.innerHTML = `<span class="badge b-ok">端口 ${port} 空闲</span>`;
+    return;
+  }
+  box.innerHTML = st.holders.map(h => `
+    <div class="listrow" style="padding:8px 0">
+      <span class="badge ${h.safe ? 'b-warn' : 'b-danger'}">PID ${h.pid}</span>
+      <span class="n"><b>${esc(h.process)}</b>
+        <div class="d mono" style="word-break:break-all">${esc(h.path || '（读不到路径）')}</div></span>
+      <span class="hint">${esc(h.state)} ${esc(h.addr)}</span>
+    </div>`).join('') +
+    `<div class="row" style="margin-top:10px">
+      <button class="sm" id="devPortKill" data-port="${port}">结束这些进程</button>
+      <span class="hint">系统关键进程会被自动跳过</span>
+    </div>`;
+  const kill = el('devPortKill');
+  if (kill) kill.addEventListener('click', () => killPortFlow(port, ''));
+}
+
+// 日志是流式追加的：重建整个列表会打断滚动，所以单独往对应容器里塞。
+function devAppendLog(id, line) {
+  if (!line) return;
+  const box = el('devLog_' + cssId(id));
+  if (!box) return;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.textContent += (box.textContent ? '\n' : '') + line;
+  if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+function devRenderOne(s) {
+  const badge = el('devStateBadge_' + cssId(s.id));
+  if (!badge) { devRenderServices(); return; }
+  const st = DEV_STATE[s.state] || DEV_STATE.stopped;
+  badge.className = 'badge ' + st.cls;
+  badge.textContent = st.text + (s.state === 'running' && s.pid ? ' · PID ' + s.pid : '');
+}
+
+async function detectAllDev() {
+  try {
+    const r = await A().DetectAllDevServices();
+    toast(r.message || '完成');
+  } catch (e) { toast(String(e), true); }
+  await refreshDev(false);
+}
+
+/* ───────── Git 变更页 ───────── */
+async function refreshGit(showToast) {
+  const box = el('gitList');
+  box.innerHTML = '<div class="hint">正在读取…</div>';
+  let repos;
+  try { repos = await A().GitChanges(); }
+  catch (e) { box.innerHTML = `<div class="hint" style="color:var(--danger)">${esc(String(e))}</div>`; return; }
+  gitLoaded = true;
+
+  if (!repos || !repos.length) {
+    box.innerHTML = '<div class="hint">还没有配置项目，或项目目录不存在。到「配置」页扫描代码目录后再来。</div>';
+    return;
+  }
+  box.innerHTML = repos.map(r => gitRepoHtml(r)).join('');
+  box.querySelectorAll('button[data-gitdir]').forEach(b =>
+    b.addEventListener('click', () => A().OpenProjectDir(b.dataset.gitdir).catch(e => toast(String(e), true))));
+}
+
+function gitRepoHtml(r) {
+  if (!r.is_repo) {
+    return `<div class="listrow" style="display:block;padding:12px;border:1px solid var(--hairline);margin-bottom:10px">
+      <div class="row"><b>${esc(r.project)}</b><span class="spacer" style="flex:1"></span>
+        <button class="sm ghost" data-gitdir="${esc(r.dir)}">打开目录</button></div>
+      <div class="hint" style="margin-top:6px">${esc(r.err || '不在 git 仓库里')}</div>
+    </div>`;
+  }
+
+  const head = `<div class="row" style="gap:10px">
+      <b style="font-size:13.5px">${esc(r.project)}</b>
+      <span class="badge b-link">${esc(r.branch || '?')}</span>
+      <span class="badge ${r.clean ? 'b-ok' : 'b-warn'}">${r.clean ? '没有未提交改动' : r.changes.length + ' 个改动'}</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="sm ghost" data-gitdir="${esc(r.dir)}">打开目录</button>
+    </div>
+    <div class="hint" style="margin-top:6px">最近提交：${esc(r.commit || '（无）')}</div>`;
+
+  if (r.clean) {
+    return `<div class="listrow" style="display:block;padding:12px;border:1px solid var(--hairline);margin-bottom:10px">${head}</div>`;
+  }
+
+  const rows = r.changes.map(c => `
+    <div class="row" style="gap:10px;padding:5px 0;border-bottom:1px solid var(--hairline)">
+      <span class="badge ${gitKindCls(c.kind)}" style="min-width:74px;justify-content:center">${esc(c.kind)}</span>
+      <span class="mono" style="flex:1;font-size:12px;word-break:break-all">${esc(c.path)}</span>
+      <span class="hint">${c.binary ? '二进制' : (c.added || c.deleted ? `+${c.added} −${c.deleted}` : '')}</span>
+    </div>`).join('');
+
+  return `<div class="listrow" style="display:block;padding:12px;border:1px solid var(--hairline);margin-bottom:10px">
+    ${head}
+    <div style="margin-top:10px;max-height:320px;overflow:auto">${rows}</div>
+    ${r.truncated ? '<div class="hint" style="margin-top:6px">改动太多，只展示了前 400 条</div>' : ''}
+  </div>`;
+}
+
+function gitKindCls(kind) {
+  if (!kind) return 'b-sum';
+  if (kind.indexOf('冲突') >= 0) return 'b-danger';
+  if (kind.indexOf('未跟踪') >= 0) return 'b-sum';
+  if (kind.indexOf('删除') >= 0) return 'b-danger';
+  if (kind.indexOf('新增') >= 0) return 'b-ok';
+  return 'b-link';
 }
 
 /* ───────── 通用确认弹窗 ───────── */

@@ -13,7 +13,7 @@ import (
 
 // DecisionGroup 是一个色区（能删 / 需确认 / 不要动）。
 type DecisionGroup struct {
-	Level      string         `json:"level"`  // safe / confirm / never
+	Level      string         `json:"level"` // safe / confirm / never
 	Title      string         `json:"title"`
 	Subtitle   string         `json:"subtitle"`
 	Items      []DecisionItem `json:"items"`
@@ -22,27 +22,31 @@ type DecisionGroup struct {
 
 // DecisionItem 是一个可操作的条目。
 type DecisionItem struct {
-	Name     string `json:"name"`     // 人话名称（不是路径）
-	Size     string `json:"size"`     // 人类可读大小
-	Reason   string `json:"reason"`   // 一句话说清为什么
+	Name     string `json:"name"`                // 人话名称（不是路径）
+	Size     string `json:"size"`                // 人类可读大小
+	Reason   string `json:"reason"`              // 一句话说清为什么
 	MoveHint string `json:"move_hint,omitempty"` // 迁移方法（如果是迁移类）
-	Path     string `json:"path"`     // 完整路径（tooltip 展示）
-	Checked  bool   `json:"checked"`  // 默认勾选状态
+	Path     string `json:"path"`                // 完整路径（tooltip 展示）
+	Checked  bool   `json:"checked"`             // 默认勾选状态
 }
 
 // BuildDecisionList 从扫描结果生成三色决策清单。
 //
 // 这是给前端展示用的最高层接口：
-//   绿色区（safe）→ 默认全选，用户直接点删除
-//   黄色区（confirm）→ 默认不选，用户逐个理解后勾
-//   红色区（never）→ 无勾选框，只展示让你知道空间去哪了
-func BuildDecisionList(res *model.ScanResult) []DecisionGroup {
+//
+//	绿色区（safe）→ 默认全选，用户直接点删除
+//	黄色区（confirm）→ 默认不选，用户逐个理解后勾
+//	红色区（never）→ 无勾选框，只展示让你知道空间去哪了
+//
+// codeRoots：用户配置的代码根目录。其下任何路径都不进绿色区——
+// 这是对开发者的关键保护（详见 safety.go 的说明）。
+func BuildDecisionList(res *model.ScanResult, codeRoots []string) []DecisionGroup {
 	type entry struct {
-		e    model.DirEntry
-		group string // safe / confirm / never
-		reason string
+		e        model.DirEntry
+		group    string
+		reason   string
 		moveHint string
-		name string
+		name     string
 	}
 
 	var entries []entry
@@ -61,34 +65,46 @@ func BuildDecisionList(res *model.ScanResult) []DecisionGroup {
 		name := humanLabel(d.Path)
 		e := entry{e: d, name: name}
 
-		// 分类 → 决策
-		group := categorize(d, res.Volumes)
-		switch group {
-		case GrpSafeClean:
+		// ① 先跑安全判定：它同时给出「能否进绿色区」与拦截原因
+		verdict := safeCleanVerdict(d.Path, codeRoots)
+		cat := categorize(d, res.Volumes)
+
+		switch {
+		case verdict.Block != "":
+			// 被硬保护拦下：一律红区，且说明具体原因
+			e.group = "never"
+			e.reason = verdict.Block
+
+		case verdict.Safe:
+			// 只在【真正的可丢弃位置】才进绿色区
 			e.group = "safe"
-			e.reason = reasonForSafeClean(p)
-		case GrpDevCache:
+			e.reason = verdict.Reason
+
+		case cat == GrpDevCache:
 			e.group = "confirm"
 			e.reason = devCacheReason(p)
 			e.moveHint = moveHint(p)
-		case GrpUserData:
+
+		case cat == GrpUserData:
 			e.group = "never"
 			e.reason = userDataReason(p)
-		case GrpSystem:
+
+		case cat == GrpSystem:
 			e.group = "never"
-			// 页面文件可以改位置，特殊处理
 			if strings.Contains(p, "pagefile") {
 				e.reason = "虚拟内存文件，可在系统设置里改到其他盘"
 				e.moveHint = "系统属性 → 高级 → 性能设置 → 虚拟内存"
 			} else {
 				e.reason = systemReason(p)
 			}
-		case GrpInstalled:
+
+		case cat == GrpInstalled:
 			e.group = "never"
 			e.reason = "已安装的软件，如需卸载请用控制面板"
+
 		default:
 			e.group = "never"
-			e.reason = "未识别的目录，不确定用途"
+			e.reason = "未识别的目录，不确定用途，不会自动处理"
 		}
 
 		entries = append(entries, e)
@@ -163,26 +179,6 @@ func parseSizeForSort(s string) float64 {
 		return v / 1024
 	}
 	return v
-}
-
-// ───────── 原因生成 ─────────
-
-func reasonForSafeClean(p string) string {
-	p = strings.ToLower(p)
-	switch {
-	case strings.Contains(p, `\temp`):
-		return "临时文件，超过 30 天未使用，删除后无影响"
-	case strings.Contains(p, `-updater`):
-		return "应用自动更新的残留包，下次更新会重新下载"
-	case strings.Contains(p, ` installer`):
-		return "安装包残留，软件已安装后可安全删除"
-	case strings.Contains(p, `crashdump`):
-		return "崩溃转储文件，已过期可安全删除"
-	case strings.Contains(p, `softwaredistribution`):
-		return "Windows 更新下载缓存，删除后不影响已安装的更新"
-	default:
-		return "临时或缓存文件，可安全删除"
-	}
 }
 
 func devCacheReason(p string) string {

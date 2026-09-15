@@ -13,6 +13,7 @@ import (
 
 	"winclean/internal/deploy"
 	"winclean/internal/report"
+	"winclean/internal/scan"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -41,14 +42,14 @@ type packSession struct {
 
 // DeployDTO 是部署页需要的全部数据。
 type DeployDTO struct {
-	Config     deploy.Config       `json:"config"`
-	Summary    string              `json:"summary"`
-	KeepEnv    string              `json:"keep_env"`
-	BaseExists bool                `json:"base_exists"`
-	OutputOK   bool                `json:"output_ok"`
-	PackBusy   bool                `json:"pack_busy"`
-	MavenSet   string              `json:"maven_set"`
-	JDKSet     string              `json:"jdk_set"`
+	Config     deploy.Config `json:"config"`
+	Summary    string        `json:"summary"`
+	KeepEnv    string        `json:"keep_env"`
+	BaseExists bool          `json:"base_exists"`
+	OutputOK   bool          `json:"output_ok"`
+	PackBusy   bool          `json:"pack_busy"`
+	MavenSet   string        `json:"maven_set"`
+	JDKSet     string        `json:"jdk_set"`
 }
 
 // PackStatusDTO 是打包进度快照。
@@ -147,9 +148,9 @@ func (a *App) ImportDeployConfig(path string) (DeployDTO, error) {
 // 数组为空时还会抛「not iterable」——实测踩过。
 // 凡是要一起返回给前端的数据，都必须装进一个结构体。
 type DiscoverResult struct {
-	Root     string                       `json:"root"`
-	Projects []deploy.DiscoveredProject   `json:"projects"`
-	Notes    []string                     `json:"notes"`
+	Root     string                     `json:"root"`
+	Projects []deploy.DiscoveredProject `json:"projects"`
+	Notes    []string                   `json:"notes"`
 }
 
 // DiscoverDeployProjects 扫描代码根目录，自动发现项目与模块。
@@ -174,9 +175,21 @@ func (a *App) DiscoverDeployProjects(codeRoot string) (DiscoverResult, error) {
 func (a *App) AdoptDiscoveredProject(proj deploy.DiscoveredProject, outputDir string, keepEnv string) error {
 	pc := deploy.ProjectConfig{Name: proj.Name, Root: proj.Root}
 	for _, m := range proj.Modules {
+		// 保留用户已改过的启动命令与端口：重新扫描时若一律用扫描结果覆盖，
+		// 用户手填的端口（比如他特意改成 8082 避开冲突）会被悄悄改回去。
+		run, port := m.Run, m.Port
+		if _, old, err := deploy.FindModule(a.cfg.Deploy, proj.Name, m.Name); err == nil {
+			if strings.TrimSpace(old.Run) != "" && strings.TrimSpace(old.Run) != strings.TrimSpace(m.Run) {
+				run = old.Run
+			}
+			if old.Port > 0 && old.Port != m.Port {
+				port = old.Port
+			}
+		}
 		pc.Modules = append(pc.Modules, deploy.ModuleConfig{
 			Name: m.Name, Type: m.Type, Root: m.Root,
 			Script: m.Script, Source: m.Source, Output: m.Output,
+			Run: run, Port: port,
 		})
 	}
 
@@ -238,9 +251,13 @@ func (a *App) BuildSpaceReport() (report.SpaceReport, error) {
 // BuildDecisionList 从最近一次扫描结果生成三色决策清单。
 //
 // 这是给用户看的最高层视图：
-//   绿色区（可以删除）→ 默认全选
-//   黄色区（需要你决定）→ 默认不选，用户逐个判断
-//   红色区（不要动）→ 无勾选框，只展示
+//
+//	绿色区（可以删除）→ 默认全选
+//	黄色区（需要你决定）→ 默认不选，用户逐个判断
+//	红色区（不要动）→ 无勾选框，只展示
+//
+// 会把用户的代码根目录传下去做硬保护：代码目录内的任何路径
+// 都不进绿色区（防止误删工作成果）。
 func (a *App) BuildDecisionList() ([]report.DecisionGroup, error) {
 	a.mu.Lock()
 	res := a.result
@@ -248,7 +265,81 @@ func (a *App) BuildDecisionList() ([]report.DecisionGroup, error) {
 	if res == nil {
 		return nil, errors.New("还没有扫描结果")
 	}
-	return report.BuildDecisionList(res), nil
+	return report.BuildDecisionList(res, a.codeRoots()), nil
+}
+
+// codeRoots 收集用户的代码根目录（用于绿色区的硬保护）。
+func (a *App) codeRoots() []string {
+	var roots []string
+	if bp := strings.TrimSpace(a.cfg.Deploy.BasePath); bp != "" {
+		roots = append(roots, bp)
+	}
+	return roots
+}
+
+// DrillDown 展开一个目录的直接子项，供用户核对判断是否可信。
+//
+// 安全约束：只允许展开【最近一次扫描结果里出现过的路径】——
+// 避免把本程序变成任意路径的探测器。
+func (a *App) DrillDown(path string) ([]report.DecisionItem, error) {
+	a.mu.Lock()
+	res := a.result
+	a.mu.Unlock()
+	if res == nil {
+		return nil, errors.New("还没有扫描结果")
+	}
+
+	target := strings.TrimRight(strings.ToLower(filepath.Clean(path)), `\`)
+	allowed := false
+	for _, d := range res.Dirs {
+		if strings.ToLower(strings.TrimRight(filepath.Clean(d.Path), `\`)) == target {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return nil, errors.New("该路径不在最近一次扫描结果中，拒绝展开")
+	}
+
+	sub, err := scan.Run(context.Background(), scan.Options{
+		Roots:    []string{path},
+		MaxDepth: 1,
+		MinSize:  0,
+		TopFiles: 3,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("展开失败: %w", err)
+	}
+	return report.BuildDrillDown(sub), nil
+}
+
+// ExportDecisionList 把决策清单导出为 Markdown 文件（供复核/存档）。
+func (a *App) ExportDecisionList() (string, error) {
+	a.mu.Lock()
+	res := a.result
+	a.mu.Unlock()
+	if res == nil {
+		return "", errors.New("还没有扫描结果，请先扫描")
+	}
+	md := report.RenderDecisionMarkdown(report.BuildDecisionList(res, a.codeRoots()))
+
+	out, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "保存判断清单",
+		DefaultFilename: "winclean-判断清单.md",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Markdown (*.md)", Pattern: "*.md"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if out == "" {
+		return "", nil // 用户取消
+	}
+	if err := os.WriteFile(out, []byte(md), 0o644); err != nil {
+		return "", fmt.Errorf("写入失败: %w", err)
+	}
+	return out, nil
 }
 
 // SuggestBasePaths 返回本机可能作为代码根目录的候选（配置页第 1 步的默认值）。
