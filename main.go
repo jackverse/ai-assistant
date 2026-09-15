@@ -20,6 +20,11 @@ import (
 
 func main() {
 	if len(os.Args) > 1 {
+		// api 走 Headless 路径：只构造 App，不开窗口。
+		// 这样 AI 可以用一条命令驱动本软件（见 docs/design/22）。
+		if os.Args[1] == "api" {
+			os.Exit(cmdAPI(os.Args[2:]))
+		}
 		os.Exit(cli.Run(os.Args[1:]))
 	}
 	runGUI()

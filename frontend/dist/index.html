@@ -1993,6 +1993,10 @@ async function initDeploy() {
 
   initDevPage();
 
+  // 默认停在「服务」页签，所以进入页面就得把服务状态拉出来。
+  // 不能指望轮询来填：轮询只在有进程运行时才跑（见 scheduleDevPoll），
+  // 没启动过服务时它永远不会触发，页面就会一直空着。
+  await refreshDev(false);
   await refreshDeploy();
   await loadBaseCandidates();
   await runDetect(false);
@@ -2337,7 +2341,6 @@ let devReady = false;
 let devData = null;          // 最近一次 GetDevPage 的结果
 let devEditing = '';         // 正在编辑命令的服务 id
 let devTimer = null;         // 轮询定时器
-let gitLoaded = false;
 
 function initDevPage() {
   if (devReady) return;
@@ -2369,10 +2372,22 @@ function initDevPage() {
   el('gitRefresh').addEventListener('click', () => refreshGit(true));
   el('devPortCheck').addEventListener('click', () => checkPortTool());
   el('devPortInput').addEventListener('keydown', e => { if (e.key === 'Enter') checkPortTool(); });
+}
 
-  // 轮询：只在页面可见且停在服务页签时跑，避免在别的页面做无谓的系统调用
-  devTimer = setInterval(() => {
+// 轮询只在【确实有进程在跑】时进行。
+//
+// 理由：没有服务运行时，界面上的状态不会自己变化（唯一的例外是别人占了端口，
+// 这个用户可以点「刷新」）。规则要求「页面加载即启动的定时器」要能被解释清楚
+// （AGENTS.md §2.2），而一个什么都不看、每 4 秒查一次系统 TCP 表的定时器解释不清。
+function scheduleDevPoll() {
+  if (devTimer) { clearTimeout(devTimer); devTimer = null; }
+  const busy = (devData && devData.services || []).some(s =>
+    s.state === 'running' || s.state === 'starting' || s.state === 'stopping');
+  if (!busy) return;
+
+  devTimer = setTimeout(() => {
     if (curPage === 'deploy' && dpTab === 'svc') refreshDev(false);
+    else scheduleDevPoll();   // 不在本页面时只重排，不做系统调用
   }, 4000);
 }
 
@@ -2402,6 +2417,8 @@ async function refreshDev(showToast) {
     const b = el('devLog_' + cssId(id));
     if (b) b.scrollTop = b.scrollHeight;
   });
+
+  scheduleDevPoll();
 }
 
 function cssId(s) { return String(s).replace(/[^A-Za-z0-9_-]/g, '_'); }
@@ -2475,6 +2492,7 @@ function devCardHtml(s) {
       <div class="row" style="margin-top:8px">
         <span class="hint">最近输出</span>
         <span class="spacer" style="flex:1"></span>
+        <button class="sm ghost" data-act="fulllog" data-id="${esc(s.id)}">全部日志</button>
         <button class="sm ghost" data-act="clearlog" data-id="${esc(s.id)}">清空</button>
       </div>
       <div id="devLog_${cssId(s.id)}" class="devlog">${esc(lines.join('\n'))}</div>` : ''}
@@ -2567,6 +2585,14 @@ async function devAction(act, id, port) {
       case 'clearlog':
         await A().DevClearLogs(id);
         break;
+      case 'fulllog': {
+        // 卡片上只放最近 80 行；追启动失败原因时再把完整缓冲拉下来
+        const all = await A().DevServiceLogs(id) || [];
+        const box = el('devLog_' + cssId(id));
+        if (box) { box.textContent = all.join('\n'); box.scrollTop = box.scrollHeight; }
+        toast('已载入完整日志（' + all.length + ' 行）');
+        return;
+      }
       case 'edit':
         devEditing = id;
         devRenderServices();
@@ -2692,7 +2718,6 @@ async function refreshGit(showToast) {
   let repos;
   try { repos = await A().GitChanges(); }
   catch (e) { box.innerHTML = `<div class="hint" style="color:var(--danger)">${esc(String(e))}</div>`; return; }
-  gitLoaded = true;
 
   if (!repos || !repos.length) {
     box.innerHTML = '<div class="hint">还没有配置项目，或项目目录不存在。到「配置」页扫描代码目录后再来。</div>';
