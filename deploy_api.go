@@ -235,6 +235,22 @@ func (a *App) BuildSpaceReport() (report.SpaceReport, error) {
 	return report.BuildSpaceReport(res), nil
 }
 
+// BuildDecisionList 从最近一次扫描结果生成三色决策清单。
+//
+// 这是给用户看的最高层视图：
+//   绿色区（可以删除）→ 默认全选
+//   黄色区（需要你决定）→ 默认不选，用户逐个判断
+//   红色区（不要动）→ 无勾选框，只展示
+func (a *App) BuildDecisionList() ([]report.DecisionGroup, error) {
+	a.mu.Lock()
+	res := a.result
+	a.mu.Unlock()
+	if res == nil {
+		return nil, errors.New("还没有扫描结果")
+	}
+	return report.BuildDecisionList(res), nil
+}
+
 // SuggestBasePaths 返回本机可能作为代码根目录的候选（配置页第 1 步的默认值）。
 func (a *App) SuggestBasePaths() []string {
 	var out []string
