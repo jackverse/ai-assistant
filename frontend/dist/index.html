@@ -539,6 +539,21 @@
         </div>
         <div id="scanbanners" style="margin-top:14px"></div>
         <div id="results"></div>
+
+        <!-- AI 分析：一个按钮 + 一个结果面板，页面不加其它元素 -->
+        <div class="row hidden" id="aiRow" style="margin-top:14px;gap:10px">
+          <button class="primary" id="btnAI">AI 分析本次扫描</button>
+          <button id="btnAIStop" class="hidden">停止</button>
+          <span class="hint">会把扫描到的路径与统计发给你在设置里配置的大模型，用于判断能否删除</span>
+        </div>
+        <div class="card hidden" id="aiPanel" style="margin-top:14px">
+          <div class="card-head">
+            <span class="t">AI 分析</span>
+            <span class="d">能删 / 不能删的理由 · 是否在用 · 最近使用时间</span>
+          </div>
+          <div class="pad" id="aiText" style="white-space:pre-wrap;font-size:13px;color:var(--fg-2);user-select:text;min-height:40px"></div>
+        </div>
+
         <div class="card" id="scanEmpty">
           <div class="empty">
             <div class="big">还没有扫描结果</div>
@@ -1569,6 +1584,42 @@ async function initScan() {
     try { toast('已生成并打开 HTML 报告：' + await A().ExportReport()); }
     catch (e) { toast(String(e), true); }
   });
+
+  // AI 分析：全局 AI 能力在扫描页的落点（流式）
+  R().EventsOn('scanai:delta', d => { appendAI(d.delta || ''); });
+  R().EventsOn('scanai:done', d => {
+    aiStreaming = false;
+    el('btnAI').disabled = false;
+    el('btnAIStop').classList.add('hidden');
+    const t = (d.content || '').trim();
+    el('aiText').textContent = d.error ? t + '\n⚠️ ' + d.error : (t || '（没有返回内容）');
+  });
+  el('btnAI').addEventListener('click', startAI);
+  el('btnAIStop').addEventListener('click', () => A().StopScanAI());
+}
+
+let aiStreaming = false;
+function appendAI(text) {
+  const box = el('aiText');
+  box.textContent += text;
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  if (near) box.scrollTop = box.scrollHeight;
+}
+
+async function startAI() {
+  if (aiStreaming) return;
+  el('aiPanel').classList.remove('hidden');
+  el('aiText').textContent = '正在整理扫描事实并分析…';
+  el('btnAI').disabled = true;
+  el('btnAIStop').classList.remove('hidden');
+  aiStreaming = true;
+  try { await A().StartScanAI(); }
+  catch (e) {
+    aiStreaming = false;
+    el('btnAI').disabled = false;
+    el('btnAIStop').classList.add('hidden');
+    el('aiText').textContent = String(e);
+  }
 }
 
 function startScanUI() {
@@ -1599,6 +1650,7 @@ async function poll() {
   el('pcur').textContent = p.current || '';
   el('pcur').title = p.current || '';
 
+  // 扫描完成：显示结果 + AI 分析入口（AI 未配置或模块停用时不显示）
   if (!p.running) {
     clearInterval(pollTimer); pollTimer = null;
     el('pbar').classList.remove('indeterminate');
@@ -1608,8 +1660,17 @@ async function poll() {
 
     if (p.error) banner('scanbanners', '扫描出错', [p.error]);
     const res = await A().Result();
-    if (res) { render(res); el('btnExport').classList.remove('hidden'); }
-    else banner('scanbanners', '扫描已结束但没有得到结果', ['请重试；若反复出现请用命令行模式查看错误详情']);
+    if (res) {
+      render(res);
+      el('btnExport').classList.remove('hidden');
+      // AI 是全局能力：配置了大模型才展示分析入口
+      try {
+        const s = await A().GetSettings();
+        if (s.ai && s.ai.configured) el('aiRow').classList.remove('hidden');
+      } catch (e) { console.warn(e); }
+    } else {
+      banner('scanbanners', '扫描已结束但没有得到结果', ['请重试；若反复出现请用命令行模式查看错误详情']);
+    }
   }
 }
 
